@@ -63,7 +63,11 @@ resource "aws_db_instance" "postgres" {
   tags = var.common_tags
 
   lifecycle {
-    ignore_changes = [password] # rotated by modules/secrets / Secrets Manager, not by plan diffs
+    # Set once by random_password at creation; ignoring drift means a
+    # re-generated random never forces a master-password rotation. The
+    # break-glass COPY lives in Secrets Manager (modules/secrets) — that is
+    # materialization, not rotation.
+    ignore_changes = [password]
   }
 }
 
