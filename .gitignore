@@ -1,10 +1,15 @@
-# terraform
+# terraform state — never committed
 **.tfstate*
-.terraform/
-.terraform.lock.hcl
-*.tfvars
-!envs/*.tfvars
 crash.log
+
+# terraform working dirs (lock file IS committed: dependency pinning is part of reproducibility)
+.terraform/
+
+# tfvars — except the per-environment inputs, which are intentionally public
+*.tfvars
+!infra/envs/*.tfvars
+
+# plan artifacts
 tfplan
 *.tfplan
 
