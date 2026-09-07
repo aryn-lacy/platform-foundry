@@ -1,0 +1,26 @@
+# terraform
+**.tfstate*
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+!envs/*.tfvars
+crash.log
+tfplan
+*.tfplan
+
+# build artifacts
+apps/backend/build/
+apps/frontend/node_modules/
+apps/frontend/build/
+apps/frontend/dist/
+
+# tooling
+.env
+.env.*
+*.log
+.DS_Store
+vendor/
+
+# node
+npm-debug.log*
+.yarn/
