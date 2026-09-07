@@ -107,11 +107,8 @@ variable "argocd_chart_version" {
   default     = "7.7.x"
 }
 
-variable "argocd_repo_secret_arn" {
-  description = "Secrets Manager ARN holding the git deploy key/token Argo CD uses to read this repository. Created out-of-band or by a prior bootstrap; referenced, not materialized, here."
-  type        = string
-  default     = ""
-}
+# Argo CD repository credentials are provisioned OUT-OF-BAND (documented in
+# infra/modules/argocd) — deliberately not a root variable.
 
 # ------------------------------------------------------------------
 # Convention

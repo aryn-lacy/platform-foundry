@@ -97,12 +97,6 @@ resource "aws_iam_role_policy_attachment" "node" {
   policy_arn = each.value
 }
 
-# Egress IP for the cluster (Auto Mode elastic IP config).
-resource "aws_eip" "egress" {
-  domain = "vpc"
-  tags   = merge(var.common_tags, { Name = "${var.project_name}-${terraform.workspace}-egress" })
-}
-
 # ------------------------------------------------------------------
 # Add-ons (validated by AWS; versions resolved at cluster version)
 # ------------------------------------------------------------------

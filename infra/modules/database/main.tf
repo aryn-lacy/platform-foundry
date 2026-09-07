@@ -68,9 +68,15 @@ resource "aws_db_instance" "postgres" {
 }
 
 # Second database on the shared instance: keycloak.
-# NOTE on the second database: PostgreSQL RDS exposes ONE database per
-# instance via db_name. The keycloak database is created by a one-shot
-# Kubernetes Job (or psql) after instance provisioning — the instance-level
+# NOTE on deferred database entities: PostgreSQL RDS creates ONE database
+# per instance via db_name, and only the master user (foundry_admin) is
+# provisioned by the instance itself. THREE entities are deferred to the
+# Phase-3 bootstrap Job (k8s/, one-shot post-provisioning):
+#   1. the `keycloak` database
+#   2. the `keycloak` PostgreSQL role (password: Secrets Manager keycloak-db)
+#   3. the `realworld_app` PostgreSQL role (password: Secrets Manager app-db)
+# Until that Job runs, the Secrets Manager app/keycloak credentials are
+# staged but not yet usable — by design, not by accident. Instance-level
 # concerns (Multi-AZ, backups, encryption) cover both databases equally.
-# The job manifest lands with Phase 3 (k8s/keycloak). This comment is the
-# contract; removing it requires updating docs/architecture.md.
+# This comment is the contract; removing it requires updating
+# docs/architecture.md.

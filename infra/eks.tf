@@ -4,7 +4,7 @@ module "eks" {
   project_name            = var.project_name
   kubernetes_version      = var.kubernetes_version
   vpc_id                  = module.network.vpc_id
-  subnet_ids              = concat(module.network.private_subnet_ids, module.network.public_subnet_ids)
+  subnet_ids              = module.network.private_subnet_ids
   endpoint_public_access  = var.endpoint_public_access
   endpoint_private_access = var.endpoint_private_access
   allowed_api_cidrs       = var.allowed_api_cidrs

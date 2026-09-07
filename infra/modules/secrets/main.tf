@@ -53,6 +53,11 @@ resource "aws_secretsmanager_secret_version" "keycloak_db" {
   })
 }
 
+resource "random_password" "keycloak_client" {
+  length  = 32
+  special = false
+}
+
 # --- keycloak admin credentials ---------------------------------------
 resource "aws_secretsmanager_secret" "keycloak_admin" {
   name = "${var.project_name}/${terraform.workspace}/keycloak-admin"
@@ -76,8 +81,30 @@ resource "aws_secretsmanager_secret" "keycloak_client" {
 resource "aws_secretsmanager_secret_version" "keycloak_client" {
   secret_id = aws_secretsmanager_secret.keycloak_client.id
   secret_string = jsonencode({
-    client-id     = "realworld-backend"
-    client-secret = random_password.keycloak_admin.result # rotated independently in prod
+    clientid     = "realworld-backend"
+    clientsecret = random_password.keycloak_client.result
+  })
+}
+
+# --- rds master credential (break-glass) ------------------------------
+# The instance master password is generated in modules/database and
+# lifecycle-ignored there (rotation is not plan-driven). It is materialized
+# here — exactly once — as the break-glass credential. Without this the
+# master password existed only in state: recoverable, but undiscoverable.
+
+resource "aws_secretsmanager_secret" "db_master" {
+  name = "${var.project_name}/${terraform.workspace}/db-master"
+  tags = var.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "db_master" {
+  secret_id = aws_secretsmanager_secret.db_master.id
+  secret_string = jsonencode({
+    username = "foundry_admin"
+    password = var.db_master_password
+    host     = var.db_endpoint
+    port     = var.db_port
+    engine   = "postgres"
   })
 }
 
@@ -94,6 +121,7 @@ data "aws_iam_policy_document" "csi_read" {
       aws_secretsmanager_secret.keycloak_db.arn,
       aws_secretsmanager_secret.keycloak_admin.arn,
       aws_secretsmanager_secret.keycloak_client.arn,
+      aws_secretsmanager_secret.db_master.arn,
     ]
   }
 }

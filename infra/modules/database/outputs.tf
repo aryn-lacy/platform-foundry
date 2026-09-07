@@ -5,6 +5,7 @@ output "app_database_name" { value = aws_db_instance.postgres.db_name }
 output "keycloak_database_name" { value = "keycloak" }
 output "security_group_id" { value = aws_security_group.db.id }
 output "master_secret_candidate" {
-  value     = random_password.master.result
-  sensitive = true
+  description = "Master credential value (feeds the break-glass secret in modules/secrets; never rendered in outputs)."
+  value       = random_password.master.result
+  sensitive   = true
 }
