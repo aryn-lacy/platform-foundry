@@ -106,6 +106,16 @@ resource "aws_secretsmanager_secret_version" "db_master" {
     port     = var.db_port
     engine   = "postgres"
   })
+
+  # Mirrors the RDS-side lifecycle ignore: written once at creation. If the
+  # upstream random ever regenerated, RDS keeps the OLD password (ignored
+  # there) — this ignore keeps the secret consistent with it instead of
+  # silently updating to a value the database would reject. Rotation is a
+  # runbook operation (modify-db-password + update-secret, atomically);
+  # see docs/runbooks/.
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
 }
 
 # IAM read policy for the CSI driver's controller role (Pod Identity).
