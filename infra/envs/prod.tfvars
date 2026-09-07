@@ -5,7 +5,7 @@ aws_region = "us-east-1"
 vpc_cidr   = "10.44.0.0/18"
 az_count   = 3
 
-kubernetes_version = "1.31"
+kubernetes_version = "1.36"
 
 db_instance_class        = "db.t4g.large"
 db_deletion_protection   = true

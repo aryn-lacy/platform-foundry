@@ -42,7 +42,7 @@ variable "az_count" {
 variable "kubernetes_version" {
   description = "EKS Kubernetes version."
   type        = string
-  default     = "1.31"
+  default     = "1.36"
 }
 
 variable "endpoint_public_access" {
