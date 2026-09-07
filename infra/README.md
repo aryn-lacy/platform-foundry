@@ -9,7 +9,7 @@ Modular OpenTofu (`tofu`). One root, workspaces selecting the landing zone (`dev
 - `variables.tf` / `outputs.tf` / `versions.tf` — the single settings block: pinned providers + backend config (only one terraform{} is allowed per module, so backend lives there)
 - `modules/` — `network`, `eks`, `database`, `secrets`, `ecr`, `argocd` (resource bodies live here, not at root)
 - `envs/dev.tfvars`, `envs/prod.tfvars` — per-landing-zone role ARN + sizing
-- `bootstrap/` — state bucket + lock table; the one documented manual step
+- `bootstrap/` — state bucket (S3-native locking, no lock table); the one documented manual step
 
 **Contract**
 

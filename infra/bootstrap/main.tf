@@ -1,9 +1,11 @@
 # Bootstrap stack — the one manual step, documented (see README).
-# Creates remote state foundations for ALL workspaces: one bucket + one lock
-# table per organization, key prefixes per workspace.
+# Creates the remote state foundation for ALL workspaces: one versioned,
+# encrypted, SSL-only S3 bucket. State locking is S3-native (use_lockfile,
+# OpenTofu >= 1.10) — conditional writes against the state object itself,
+# so there is no DynamoDB lock table to provision.
 
 terraform {
-  required_version = ">= 1.8.0"
+  required_version = ">= 1.10.0"
 }
 
 provider "aws" {
@@ -58,23 +60,6 @@ data "aws_iam_policy_document" "state_ssl_only" {
 resource "aws_s3_bucket_policy" "state_ssl_only" {
   bucket = aws_s3_bucket.state.id
   policy = data.aws_iam_policy_document.state_ssl_only.json
-}
-
-resource "aws_dynamodb_table" "lock" {
-  name         = "${var.bucket_name_prefix}-tflock"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-
-  point_in_time_recovery {
-    recovery_period_in_days = 35
-    enabled                 = true
-  }
-  tags = { Project = "platform-foundry", Purpose = "tflock" }
 }
 
 variable "aws_region" {
