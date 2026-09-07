@@ -48,12 +48,13 @@ what must not.
 git clone https://github.com/aryn-lacy/platform-foundry.git
 cd platform-foundry
 make help                      # every available target
+```
 
 # Provision (per landing zone):
 cd infra
-terraform init
-terraform workspace select dev  # or: terraform workspace new dev
-terraform plan -var-file=envs/dev.tfvars
+tofu init
+tofu workspace select dev  # or: tofu workspace new dev
+tofu plan -var-file=envs/dev.tfvars
 ```
 
 Remote state bootstrap is the one documented manual step — see

@@ -4,12 +4,12 @@ help: ## Show this help
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: fmt
-fmt: ## Format terraform
-	cd infra && terraform fmt -recursive
+fmt: ## Format opentofu (tofu)
+	cd infra && tofu fmt -recursive
 
 .PHONY: validate
-validate: ## Validate terraform for both workspaces
-	cd infra && terraform init -backend=false && terraform validate
+validate: ## Validate opentofu for both environments
+	cd infra && tofu init -backend=false && tofu validate
 
 .PHONY: kustomize
 kustomize: ## Render all k8s overlays to stdout summary

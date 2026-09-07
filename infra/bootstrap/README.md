@@ -14,9 +14,9 @@ state it will hold. Chicken, egg, one-time.
 
 ```bash
 cd infra/bootstrap
-terraform init
-terraform plan
-terraform apply
+tofu init
+tofu plan
+tofu apply
 ```
 
 Then reference the outputs in `infra/backend.tf`.

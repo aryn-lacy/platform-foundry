@@ -1,6 +1,6 @@
 # infra/ — the AWS estate
 
-Modular Terraform. One root, workspaces selecting the landing zone (`dev`, `prod`).
+Modular OpenTofu (`tofu`). One root, workspaces selecting the landing zone (`dev`, `prod`).
 
 **Layout**
 
@@ -15,4 +15,4 @@ Modular Terraform. One root, workspaces selecting the landing zone (`dev`, `prod
 
 - Root files instantiate; modules contain. A root file that grows a resource body is a bug.
 - No secrets in tfvars — values are references; materialization happens in Secrets Manager.
-- `terraform validate` must pass for both workspaces before merge (CI enforces).
+- `terraform validate` must pass for both workspaces before merge (CI enforces). The repo standardizes on OpenTofu (`tofu`); commands are drop-in equivalent.
