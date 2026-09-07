@@ -1,8 +1,18 @@
 # One instance, two databases (ADR-007-adjacent cost decision, documented in
 # docs/decisions/): the RealWorld app database and Keycloak's database share
-# a Multi-AZ PostgreSQL instance. Credentials are NOT set here — they are
-# generated and stored by modules/secrets and injected via the Secrets Store
-# CSI driver at pod start (see k8s/*/base).
+# a Multi-AZ PostgreSQL instance.
+#
+# Credential flow (full picture):
+# - random_password.master (below) IS the instance master credential: it
+#   sets the RDS password at creation and is materialized exactly once by
+#   modules/secrets as the break-glass `db-master` secret.
+# - Per-service credentials (realworld_app, keycloak roles) are generated
+#   and staged in Secrets Manager by modules/secrets — but the Postgres
+#   ROLES themselves are created by the Phase-3 bootstrap Job (see the
+#   deferred-entities note below), which connects as master via CSI-mounted
+#   db-master and creates each role with its already-staged password.
+# - Workload pods then connect with their own least-privilege credentials
+#   (Secrets Store CSI); the master credential returns to break-glass duty.
 
 resource "random_password" "master" {
   length  = 24
