@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-keycloak
+  namespace: argocd
+spec:
+  project: platform-foundry
+  source:
+    repoURL: https://github.com/aryn-lacy/platform-foundry.git
+    targetRevision: main
+    path: k8s/keycloak/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keycloak
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

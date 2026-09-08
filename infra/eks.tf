@@ -1,6 +1,6 @@
 # Workload associations (ADR-002, revised): the mounting SAs defined by
-# the k8s manifests (k8s/backend, k8s/keycloak) bound to the shared
-# read-scoped role. Declarative bindings — see the workload identity
+# the k8s manifests (k8s/backend, k8s/keycloak, k8s/bootstrap) bound to
+# the shared read-scoped role. Declarative bindings — see the workload identity
 # contract in docs/architecture.md: these SAs don't exist until Argo
 # delivers the workloads; renames are a two-file, same-PR change
 # (this map + the k8s manifest).

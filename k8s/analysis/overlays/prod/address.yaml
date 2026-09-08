@@ -1,0 +1,9 @@
+# Assumed platform Prometheus (A3) — per landing zone
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: not-used
+spec:
+  args:
+    - name: prometheus-address
+      value: http://prometheus.platform-prod.svc:9090

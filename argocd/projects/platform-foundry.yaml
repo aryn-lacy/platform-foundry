@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-foundry
+  namespace: argocd
+spec:
+  description: platform-foundry workloads (RealWorld/Conduit payload)
+  sourceRepos:
+    - https://github.com/aryn-lacy/platform-foundry.git
+  destinations:
+    - namespace: conduit
+      server: https://kubernetes.default.svc
+    - namespace: keycloak
+      server: https://kubernetes.default.svc
+    - namespace: foundry-bootstrap
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

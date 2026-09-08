@@ -1,0 +1,21 @@
+# Env-specific secret path: platform-foundry/prod/app-db
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: backend-db
+spec:
+  parameters:
+    objects: |
+      - objectName: "platform-foundry/prod/app-db"
+        type: secretsmanager
+        jmesPath:
+          - path: username
+            objectAlias: dbuser
+          - path: password
+            objectAlias: dbpassword
+          - path: host
+            objectAlias: dbhost
+          - path: port
+            objectAlias: dbport
+          - path: dbname
+            objectAlias: dbname
