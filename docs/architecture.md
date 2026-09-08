@@ -99,15 +99,46 @@ Delivered by GitOps, not by CI pushing to clusters:
 
 - **Argo CD app-of-apps** — Applications per workload per environment;
   dev auto-syncs, prod is gated on the promotion PR.
+- **Namespaces** — `conduit` holds the application (backend + frontend);
+  `keycloak` holds the identity tier. Namespace boundaries align with the
+  NetworkPolicy and Pod Identity seams.
 - **Workloads** — backend (Rollout, HPA, PDB, probes incl. JVM startup),
-  frontend (same discipline), Keycloak (stock image, realm-as-code).
-- **Progressive delivery** — Argo Rollouts step-pause canary with an
-  AnalysisTemplate guard against the platform Prometheus
+  frontend (same discipline), Keycloak (stock image, lean realm-as-code:
+  realm + `realworld-backend` client + redirect URI).
+- **Progressive delivery** — Argo Rollouts step-pause canary
+  (20% → 5m → 50% → 5m → 100%) with an AnalysisTemplate guard against the
+  platform Prometheus
   ([ADR-005](decisions/005-canary-analysistemplate-k6.md)).
-- **Hardening** — default-deny NetworkPolicies with explicit allows;
+- **Hardening** — default-deny NetworkPolicies with explicit allows
+  (frontend→backend, backend→keycloak, backend/keycloak→their RDS tiers);
   security contexts; topology spread; PDBs on everything.
-- **Secrets** — Secrets Store CSI + SecretProviderClasses mount what each
-  pod needs at start; nothing secret-shaped in git.
+- **Secrets** — Secrets Store CSI + SecretProviderClasses (with
+  `usePodIdentity: "true"`) mount what each pod needs at start; nothing
+  secret-shaped in git.
+- **Bootstrap Job** — one-shot, `k8s/bootstrap/`: connects to each RDS
+  tier as master (CSI-mounted break-glass `db-master-<tier>`) and creates
+  the `realworld_app` and `keycloak` roles with their staged passwords
+  ([ADR-008](decisions/008-two-rds-instances.md)). Roles only — each
+  instance provisions its own database.
+
+### Workload identity contract (ADR-002, revised)
+
+Pod Identity associations are **declarative bindings** — namespace +
+service-account name + role ARN, held in the EKS control plane. Per AWS
+docs, the referenced namespace/SA need not exist yet: the association is
+inert until the first pod using that SA requests a token. Consequences:
+
+- The associations live in the **infra root** (`infra/eks.tf`) alongside
+  the shared read-scoped role, applied before the workloads exist. No
+  two-phase apply, no separate root — the binding semantics make the
+  ordering a non-problem.
+- **The contract:** renaming a workload service account is a two-file
+  change — the k8s manifest *and* `infra/eks.tf`, in the same PR. A
+  renamed SA with a stale association fails closed: the mount errors, it
+  does not silently degrade.
+- Image tags in manifests are `v0.0.0-placeholder` placeholders; CI's
+  `kustomize edit set image` loop overwrites them. `latest` is banned
+  (policies/ will enforce).
 
 *(Manifests land with Phase 3; the contract above is fixed.)*
 

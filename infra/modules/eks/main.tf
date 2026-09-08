@@ -137,7 +137,9 @@ resource "aws_eks_addon" "cloudwatch_observability" {
 }
 
 # ------------------------------------------------------------------
-# Pod Identity: controller role (ADR-002 — app pods carry no AWS IAM)
+# Pod Identity: shared read-scoped role (ADR-002, revised — per-workload
+# associations borrow this role at mount time; app pods hold no
+# credentials, SDK, or AWS API calls; their SAs carry the association)
 # ------------------------------------------------------------------
 
 data "aws_iam_policy_document" "pod_identity_trust" {

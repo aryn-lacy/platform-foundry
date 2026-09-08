@@ -11,8 +11,9 @@ module "eks" {
   common_tags             = var.common_tags
 }
 
-# Attach the secrets CSI read policy to the controller role (ADR-002:
-# controllers only; app pods carry no AWS IAM).
+# Attach the secrets CSI read policy to the shared read-scoped role
+# (ADR-002 revised: per-workload Pod Identity associations borrow this
+# role at mount time; app pods hold no credentials, SDK, or AWS calls).
 resource "aws_iam_role_policy_attachment" "csi_read" {
   role       = module.eks.pod_identity_role_name
   policy_arn = module.secrets.csi_read_policy_arn
