@@ -1,8 +1,7 @@
-# Assumed platform Prometheus (A3) — per landing zone
+# Assumed platform Prometheus (A3) — per landing zone. Patched onto both
+# templates via target selector; no metadata.name needed.
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
-metadata:
-  name: not-used
 spec:
   args:
     - name: prometheus-address

@@ -41,7 +41,10 @@ spec:
               set -eu
               mkdir -p /opt/keycloak/data/import
               CLIENT_SECRET=$(cat /mnt/secrets/keycloak/clientsecret)
-              sed "s/REALM_PLACEHOLDER_CLIENT_SECRET/$${CLIENT_SECRET}/g" \
+              # single-quoted pattern matches the literal ${...} token in the
+              # realm JSON; the replacement splices the variable via quote
+              # concatenation — no $$ (PID expansion), no wrapper residue.
+              sed 's/${REALM_PLACEHOLDER_CLIENT_SECRET}/'"$CLIENT_SECRET"'/g' \
                 /opt/keycloak/data/import-src/realm.json \
                 > /opt/keycloak/data/import/realm.json
               exec /opt/keycloak/bin/kc.sh start --import-realm

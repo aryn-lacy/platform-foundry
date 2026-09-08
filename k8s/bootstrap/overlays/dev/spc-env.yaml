@@ -1,4 +1,6 @@
-# Env-specific break-glass + credential paths (dev landing zone)
+# Env-specific break-glass + credential paths (dev landing zone).
+# Hosts come from the MASTER secrets (same instance as the service
+# credential, by ADR-008 construction) — matches base alias layout.
 apiVersion: secrets-store.csi.x-k8s.io/v1
 kind: SecretProviderClass
 metadata:
@@ -12,25 +14,21 @@ spec:
           - path: password
             objectAlias: masterapppassword
           - path: host
-            objectAlias: masterapphost
+            objectAlias: apphost
       - objectName: "platform-foundry/dev/app-db"
         type: secretsmanager
         jmesPath:
           - path: password
             objectAlias: apppassword
-          - path: host
-            objectAlias: apphost
       - objectName: "platform-foundry/dev/db-master-keycloak"
         type: secretsmanager
         jmesPath:
           - path: password
             objectAlias: masterkcpassword
           - path: host
-            objectAlias: masterkchost
+            objectAlias: kchost
       - objectName: "platform-foundry/dev/keycloak-db"
         type: secretsmanager
         jmesPath:
           - path: password
             objectAlias: kcpassword
-          - path: host
-            objectAlias: kchost
