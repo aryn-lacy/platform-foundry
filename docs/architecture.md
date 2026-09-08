@@ -128,8 +128,9 @@ service-account name + role ARN, held in the EKS control plane. Per AWS
 docs, the referenced namespace/SA need not exist yet: the association is
 inert until the first pod using that SA requests a token. Consequences:
 
-- The associations live in the **infra root** (`infra/eks.tf`) alongside
-  the shared read-scoped role, applied before the workloads exist. No
+- The associations live in the **EKS module** (`modules/eks`), driven by
+  the root's `workload_associations` map (`infra/eks.tf`) and bound to the
+  shared read-scoped role — applied before the workloads exist. No
   two-phase apply, no separate root — the binding semantics make the
   ordering a non-problem.
 - **The contract:** renaming a workload service account is a two-file

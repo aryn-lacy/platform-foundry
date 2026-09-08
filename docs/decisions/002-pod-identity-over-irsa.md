@@ -28,8 +28,9 @@ Identity token for credentials. Consequences:
 
 EKS Pod Identity. One IAM role (`modules/eks`), read-scoped by the CSI
 policy (6 secret ARNs). Per-workload `aws_eks_pod_identity_association`
-resources land with the workloads in Phase 3, alongside
-SecretProviderClasses that set `usePodIdentity: "true"`.
+resources are provisioned in `modules/eks`, driven by the
+`workload_associations` map instantiated at the root (`infra/eks.tf`);
+the workloads' SecretProviderClasses set `usePodIdentity: "true"`.
 
 ## The accurate posture (replacing the earlier "zero IAM" claim)
 
