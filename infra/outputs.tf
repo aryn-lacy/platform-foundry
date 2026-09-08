@@ -45,12 +45,12 @@ output "keycloak_database_endpoint" {
 }
 
 output "app_database_name" {
-  description = "Application database name (on the shared instance)."
+  description = "Application database name (app-tier instance)."
   value       = module.rds_postgres.app_database_name
 }
 
 output "keycloak_database_name" {
-  description = "Keycloak database name (on the shared instance)."
+  description = "Keycloak database name (identity-tier instance)."
   value       = module.rds_postgres.keycloak_database_name
 }
 
