@@ -68,8 +68,10 @@ hand-rolled modules ([ADR-009](decisions/009-hand-rolled-modules.md)).
   `amazon-cloudwatch-observability`, community `metrics-server`, `adot`.
   Control plane: **private endpoint by default** (public access off unless an
   environment explicitly enables it with a CIDR allow-list). Workload identity:
-  **Pod Identity for controllers only** — app pods carry zero AWS IAM
-  ([ADR-002](decisions/002-pod-identity-over-irsa.md)).
+  **Pod Identity, per workload via ASCP** — app pods hold no AWS
+  credentials, ship no SDK, make no AWS calls; their service accounts
+  carry read-scoped associations ASCP borrows at mount time
+  ([ADR-002](decisions/002-pod-identity-over-irsa.md), revised).
 - **Data** — **two RDS PostgreSQL Multi-AZ instances**
   ([ADR-008](decisions/008-two-rds-instances.md)): app tier and identity
   tier fully isolated — separate backup estates, maintenance windows,
@@ -150,7 +152,7 @@ Ship it, don't host it ([assumption A3](assumptions.md)):
 
 | Layer | Control |
 |---|---|
-| Workload identity | Pod Identity, controllers only; app pods = zero AWS IAM |
+| Workload identity | Pod Identity per workload (ASCP-borrowed); app pods = zero credentials, zero AWS calls ([ADR-002](decisions/002-pod-identity-over-irsa.md)) |
 | Secrets | Secrets Manager + CSI (6-ARN read policy); break-glass masters lifecycle-frozen; nothing in git |
 | Network | Private subnets; endpoint private by default (public opt-in + CIDR allow-list); default-deny east-west NPs; SG-scoped data tier; TLS terminates at ACM on the ALB |
 | Supply chain | Immutable ECR tags; scan-on-push; Trivy gate in CI; dependabot |

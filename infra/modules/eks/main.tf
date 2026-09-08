@@ -156,20 +156,24 @@ resource "aws_iam_role" "this_controller" {
   tags               = var.common_tags
 }
 
-# Secrets Store CSI: the ONE Pod Identity consumer (ADR-002) is the ASCP
-# provider — csi-secrets-store-provider-aws (kube-system) — the component
-# that actually calls secretsmanager:GetSecretValue. The base CSI driver's
-# SA (secrets-store-csi-driver) makes no AWS API calls; the Auto Mode LB
-# controller is AWS-operated and holds no association.
-# MODEL DECISION: provider-level association (NOT per-pod usePodIdentity) —
-# consistent with ADR-002's controllers-only posture: app pods carry no AWS
-# IAM at all, the provider fetches on their behalf. SecretProviderClasses
-# in k8s/ therefore must NOT set usePodIdentity.
-resource "aws_eks_pod_identity_association" "secrets_csi" {
-  cluster_name    = aws_eks_cluster.this.name
-  namespace       = "kube-system"
-  service_account = "csi-secrets-store-provider-aws"
-  role_arn        = aws_iam_role.this_controller.arn
-
-  tags = var.common_tags
+# Pod Identity + ASCP credential model (ADR-002, corrected):
+#
+# ASCP resolves AWS identity from the MOUNTING POD's service account —
+# never its own (verified in ASCP server/server.go: it reads
+# csi.storage.k8s.io/serviceAccount.name/.tokens from the mount request
+# and exchanges that SA's Pod Identity token). Therefore:
+#   - There is NO controller-level association to create here. A
+#     provider-SA association would be dead code.
+#   - Associations are PER WORKLOAD (backend, keycloak) and land with the
+#     workloads themselves in Phase 3, when their namespaces/service
+#     accounts exist: one aws_eks_pod_identity_association each, bound to
+#     this role, with usePodIdentity: "true" in the SecretProviderClass.
+#   - App pods hold no AWS credentials, ship no AWS SDK, and make no AWS
+#     calls; their SAs carry this read-scoped association, which ASCP
+#     borrows. "Zero IAM" was the wrong claim — "zero credentials, zero
+#     calls, read-only scoped association" is the accurate posture.
+resource "aws_iam_role" "this_controller" {
+  name               = "${var.project_name}-${terraform.workspace}-podid"
+  assume_role_policy = data.aws_iam_policy_document.pod_identity_trust.json
+  tags               = var.common_tags
 }
