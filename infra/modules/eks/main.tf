@@ -150,12 +150,6 @@ data "aws_iam_policy_document" "pod_identity_trust" {
   }
 }
 
-resource "aws_iam_role" "this_controller" {
-  name               = "${var.project_name}-${terraform.workspace}-podid"
-  assume_role_policy = data.aws_iam_policy_document.pod_identity_trust.json
-  tags               = var.common_tags
-}
-
 # Pod Identity + ASCP credential model (ADR-002, corrected):
 #
 # ASCP resolves AWS identity from the MOUNTING POD's service account —
