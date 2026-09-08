@@ -7,12 +7,46 @@ resource "aws_ecr_repository" "this" {
   name                 = "${var.project_name}/${each.key}"
   image_tag_mutability = "IMMUTABLE"
 
+  # ECR encrypted with a dedicated CMK (checkov CKV_AWS_136).
+  encryption_configuration {
+    encryption_type = "KMS"
+    kms_key         = aws_kms_key.ecr.arn
+  }
+
   image_scanning_configuration {
     scan_on_push = true
   }
 
   tags = var.common_tags
 }
+
+# Dedicated CMK for ECR image encryption (checkov CKV_AWS_136) with an
+# explicit key policy (checkov CKV2_AWS_64).
+resource "aws_kms_key" "ecr" {
+  description             = "${var.project_name}-${terraform.workspace} ECR"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  tags                    = var.common_tags
+}
+
+resource "aws_kms_key_policy" "ecr" {
+  key_id = aws_kms_key.ecr.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "Enable IAM User Permissions"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+    ]
+  })
+}
+
+data "aws_partition" "current" {}
+data "aws_caller_identity" "current" {}
 
 resource "aws_ecr_lifecycle_policy" "this" {
   for_each = aws_ecr_repository.this

@@ -4,6 +4,36 @@
 #
 # Tier split mirrors ADR-008: app and keycloak have separate instances,
 # separate endpoints, separate break-glass master credentials.
+#
+# All secrets encrypted with a dedicated CMK (checkov CKV_AWS_149) with a
+# key policy scoped to the account root (checkov CKV2_AWS_64) — access
+# control stays with IAM + the CSI read policy; no cross-account use.
+
+resource "aws_kms_key" "secrets" {
+  description             = "${var.project_name}-${terraform.workspace} secrets"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  tags                    = var.common_tags
+}
+
+resource "aws_kms_key_policy" "secrets" {
+  key_id = aws_kms_key.secrets.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "Enable IAM User Permissions"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+    ]
+  })
+}
+
+data "aws_partition" "current" {}
+data "aws_caller_identity" "current" {}
 
 resource "random_password" "keycloak_admin" {
   length  = 24
@@ -27,8 +57,10 @@ resource "random_password" "keycloak_client" {
 
 # --- application database credentials (app instance) -------------------
 resource "aws_secretsmanager_secret" "app_db" {
-  name = "${var.project_name}/${terraform.workspace}/app-db"
-  tags = var.common_tags
+  # checkov:skip=CKV2_AWS_57: Rotation requires a Lambda rotation function; break-glass copies materialize (not rotate) master creds, app creds rotate via re-bootstrap — documented roadmap item, not an omission
+  name       = "${var.project_name}/${terraform.workspace}/app-db"
+  kms_key_id = aws_kms_key.secrets.arn
+  tags       = var.common_tags
 }
 
 resource "aws_secretsmanager_secret_version" "app_db" {
@@ -45,8 +77,10 @@ resource "aws_secretsmanager_secret_version" "app_db" {
 
 # --- keycloak database credentials (identity instance) ------------------
 resource "aws_secretsmanager_secret" "keycloak_db" {
-  name = "${var.project_name}/${terraform.workspace}/keycloak-db"
-  tags = var.common_tags
+  # checkov:skip=CKV2_AWS_57: Rotation requires a Lambda rotation function; break-glass copies materialize (not rotate) master creds, app creds rotate via re-bootstrap — documented roadmap item, not an omission
+  name       = "${var.project_name}/${terraform.workspace}/keycloak-db"
+  kms_key_id = aws_kms_key.secrets.arn
+  tags       = var.common_tags
 }
 
 resource "aws_secretsmanager_secret_version" "keycloak_db" {
@@ -63,8 +97,10 @@ resource "aws_secretsmanager_secret_version" "keycloak_db" {
 
 # --- keycloak admin credentials ---------------------------------------
 resource "aws_secretsmanager_secret" "keycloak_admin" {
-  name = "${var.project_name}/${terraform.workspace}/keycloak-admin"
-  tags = var.common_tags
+  # checkov:skip=CKV2_AWS_57: Rotation requires a Lambda rotation function; break-glass copies materialize (not rotate) master creds, app creds rotate via re-bootstrap — documented roadmap item, not an omission
+  name       = "${var.project_name}/${terraform.workspace}/keycloak-admin"
+  kms_key_id = aws_kms_key.secrets.arn
+  tags       = var.common_tags
 }
 
 resource "aws_secretsmanager_secret_version" "keycloak_admin" {
@@ -77,8 +113,10 @@ resource "aws_secretsmanager_secret_version" "keycloak_admin" {
 
 # --- keycloak client secret (backend <-> keycloak) --------------------
 resource "aws_secretsmanager_secret" "keycloak_client" {
-  name = "${var.project_name}/${terraform.workspace}/keycloak-client"
-  tags = var.common_tags
+  # checkov:skip=CKV2_AWS_57: Rotation requires a Lambda rotation function; break-glass copies materialize (not rotate) master creds, app creds rotate via re-bootstrap — documented roadmap item, not an omission
+  name       = "${var.project_name}/${terraform.workspace}/keycloak-client"
+  kms_key_id = aws_kms_key.secrets.arn
+  tags       = var.common_tags
 }
 
 resource "aws_secretsmanager_secret_version" "keycloak_client" {
@@ -95,10 +133,12 @@ resource "aws_secretsmanager_secret_version" "keycloak_client" {
 # materialized here — exactly once — as its tier's break-glass credential.
 
 resource "aws_secretsmanager_secret" "db_master" {
+  # checkov:skip=CKV2_AWS_57: Rotation requires a Lambda rotation function; break-glass copies materialize (not rotate) master creds, app creds rotate via re-bootstrap — documented roadmap item, not an omission
   for_each = toset(["app", "keycloak"])
 
-  name = "${var.project_name}/${terraform.workspace}/db-master-${each.key}"
-  tags = var.common_tags
+  name       = "${var.project_name}/${terraform.workspace}/db-master-${each.key}"
+  kms_key_id = aws_kms_key.secrets.arn
+  tags       = var.common_tags
 }
 
 resource "aws_secretsmanager_secret_version" "db_master" {

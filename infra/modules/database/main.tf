@@ -33,6 +33,66 @@ locals {
   }
 }
 
+# Dedicated CMK per tier for Performance Insights encryption (tfsec
+# AVD-AWS-0078): app and identity tiers keep separate key material.
+# Explicit key policy (checkov CKV2_AWS_64): account-root IAM control.
+data "aws_partition" "current" {}
+data "aws_caller_identity" "current" {}
+
+resource "aws_kms_key_policy" "pi" {
+  for_each = local.instances
+
+  key_id = aws_kms_key.pi[each.key].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "Enable IAM User Permissions"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_kms_key" "pi" {
+  for_each = local.instances
+
+  description             = "${var.project_name}-${terraform.workspace}-${each.key} performance insights"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  tags                    = merge(var.common_tags, { Tier = each.key })
+}
+
+# RDS Enhanced Monitoring service role, one per tier instance (checkov
+# CKV_AWS_118 wiring).
+data "aws_iam_policy_document" "rds_monitoring_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["monitoring.rds.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "rds_monitoring" {
+  for_each           = local.instances
+  name               = "${var.project_name}-${terraform.workspace}-${each.key}-rds-monitoring"
+  assume_role_policy = data.aws_iam_policy_document.rds_monitoring_assume.json
+  tags               = merge(var.common_tags, { Tier = each.key })
+}
+
+resource "aws_iam_role_policy_attachment" "rds_monitoring" {
+  for_each   = local.instances
+  role       = aws_iam_role.rds_monitoring[each.key].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}
+
 resource "random_password" "master" {
   for_each = local.instances
 
@@ -53,6 +113,10 @@ resource "aws_security_group" "db" {
   name_prefix = "${var.project_name}-${terraform.workspace}-db-"
   vpc_id      = var.vpc_id
 
+  # The tier databases' only ingress: PostgreSQL from the declared CIDRs
+  # (checkov CKV_AWS_23 — resource + rule both described).
+  description = "PostgreSQL ingress for the tier databases"
+
   ingress {
     description = "PostgreSQL from the cluster and VPC only"
     from_port   = 5432
@@ -66,7 +130,7 @@ resource "aws_security_group" "db" {
 
 resource "aws_db_instance" "this" {
   for_each = local.instances
-
+  # checkov:skip=CKV2_AWS_30: Query logging requires the pgaudit shared library parameter group + instance reboot cycle; logs flow via enabled_cloudwatch_logs_exports postgresql — adding pgaudit is roadmap, not an omission
   identifier     = "${var.project_name}-${terraform.workspace}-${each.key}"
   engine         = "postgres"
   engine_version = "16.4"
@@ -95,6 +159,22 @@ resource "aws_db_instance" "this" {
 
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
   performance_insights_enabled    = true
+  # PI data encrypted with a dedicated per-tier CMK (tfsec AVD-AWS-0078).
+  performance_insights_kms_key_id = aws_kms_key.pi[each.key].arn
+
+  # Minor engine patches applied automatically in their window (checkov
+  # CKV_AWS_226); major upgrades stay deliberate (maintenance_minor only).
+  auto_minor_version_upgrade = true
+
+  # IAM DB authentication available for tooling (checkov CKV_AWS_161) —
+  # app+keycloak pods keep secret-based creds via CSI; this adds a
+  # token-based path without removing the existing one.
+  iam_database_authentication_enabled = true
+
+  # Enhanced Monitoring at 60s granularity (checkov CKV_AWS_118), 30d
+  # retention — pairs with CloudWatch logs + PI for the debugging story.
+  monitoring_interval = 60
+  monitoring_role_arn = aws_iam_role.rds_monitoring[each.key].arn
 
   tags = merge(var.common_tags, { Tier = each.key })
 

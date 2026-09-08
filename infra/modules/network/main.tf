@@ -26,6 +26,107 @@ resource "aws_vpc" "this" {
   tags = merge(var.common_tags, { Name = "${var.project_name}-${terraform.workspace}" })
 }
 
+# Default SG exists whether we declare it or not — pin it empty
+# (checkov CKV2_AWS_12): all traffic flows through explicitly declared SGs.
+resource "aws_default_security_group" "this" {
+  vpc_id = aws_vpc.this.id
+
+  tags = merge(var.common_tags, { Name = "${var.project_name}-${terraform.workspace}-default-empty" })
+}
+
+# Network-module CMK (flow-log group encryption, checkov CKV_AWS_158) with
+# an explicit key policy (checkov CKV2_AWS_64).
+data "aws_partition" "current" {}
+data "aws_caller_identity" "current" {}
+
+resource "aws_kms_key" "network" {
+  description             = "${var.project_name}-${terraform.workspace} network"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  tags                    = var.common_tags
+}
+
+resource "aws_kms_key_policy" "network" {
+  key_id = aws_kms_key.network.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "Enable IAM User Permissions"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+    ]
+  })
+}
+
+# VPC flow logs to CloudWatch (checkov CKV2_AWS_11): historical network
+# telemetry for the bottleneck-debugging requirement. 365d retention
+# (CKV_AWS_338) and CMK encryption (CKV_AWS_158) per gate.
+resource "aws_cloudwatch_log_group" "flow" {
+  name              = "/aws/vpc/${var.project_name}-${terraform.workspace}"
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.network.arn
+  tags              = var.common_tags
+}
+
+# Flow Logs assume this service role (checkov CKV2_AWS_11 wiring).
+data "aws_iam_policy_document" "flowlogs_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "flowlogs" {
+  name               = "${var.project_name}-${terraform.workspace}-flowlogs"
+  assume_role_policy = data.aws_iam_policy_document.flowlogs_assume.json
+  tags               = var.common_tags
+}
+
+data "aws_iam_policy_document" "flowlogs_write" {
+  # CreateLogGroup on the exact ARN only (tfsec AVD-AWS-0057: sensitive
+  # action must not sit on a wildcarded resource); stream/event ops on the
+  # group's children.
+  statement {
+    effect    = "Allow"
+    actions   = ["logs:CreateLogGroup", "logs:CreateLogStream"]
+    resources = [aws_cloudwatch_log_group.flow.arn]
+  }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:PutLogEvents",
+      "logs:DescribeLogGroups",
+      "logs:DescribeLogStreams",
+    ]
+    resources = ["${aws_cloudwatch_log_group.flow.arn}:*"] # tfsec:ignore:AVD-AWS-0057: PutLogEvents targets child stream ARNs — the wildcard suffix is structural (streams are created at delivery time); scope is this one group's children, not account-wide
+  }
+}
+
+resource "aws_iam_role_policy" "flowlogs" {
+  name   = "write-flow-logs"
+  role   = aws_iam_role.flowlogs.id
+  policy = data.aws_iam_policy_document.flowlogs_write.json
+}
+
+resource "aws_flow_log" "this" {
+  vpc_id               = aws_vpc.this.id
+  traffic_type         = "ALL"
+  log_destination_type = "cloud-watch-logs"
+  log_destination      = aws_cloudwatch_log_group.flow.arn
+  iam_role_arn         = aws_iam_role.flowlogs.arn
+  tags                 = var.common_tags
+}
+
 resource "aws_subnet" "public" {
   for_each = { for idx, az in local.azs : az => idx }
 
