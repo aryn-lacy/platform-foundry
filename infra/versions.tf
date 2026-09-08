@@ -4,6 +4,17 @@
 # OpenTofu permits exactly one terraform settings block per module.
 # The state bucket is created by infra/bootstrap/; locking is S3-native
 # (use_lockfile — conditional writes), so no lock table exists anywhere.
+#
+# OpenTofu, not Terraform (ADR-010, full argument in docs/decisions/):
+# a deliberate choice of convenience and ecosystem fit — the authoring
+# environment and personal IaC standardize on OpenTofu; open-source CI/CD
+# tooling (Digger, OpenTaco-class runners) integrates more smoothly with
+# OpenTofu; and the Terraform-equivalent binary is a drop-in replacement
+# for this configuration should a landing zone mandate it (the HCL is
+# tool-identical; only the runner differs). Enterprise Terraform features
+# (state/workspaces as a service) carry enterprise pricing that personal
+# projects have no reason to pay when an open, LinuxFoundation-governed
+# alternative implements the same language.
 
 terraform {
   # >= 1.10: S3-native state locking (use_lockfile) available in the backend.
