@@ -156,14 +156,19 @@ resource "aws_iam_role" "this_controller" {
   tags               = var.common_tags
 }
 
-# Secrets Store CSI driver: the ONE Pod Identity consumer (ADR-002). The
-# load balancer controller is AWS-operated under Auto Mode and holds no
-# pod-identity association. Namespace/name pinned to the EKS add-on's
-# deployment; read policy attached at the root (infra/eks.tf).
+# Secrets Store CSI: the ONE Pod Identity consumer (ADR-002) is the ASCP
+# provider — csi-secrets-store-provider-aws (kube-system) — the component
+# that actually calls secretsmanager:GetSecretValue. The base CSI driver's
+# SA (secrets-store-csi-driver) makes no AWS API calls; the Auto Mode LB
+# controller is AWS-operated and holds no association.
+# MODEL DECISION: provider-level association (NOT per-pod usePodIdentity) —
+# consistent with ADR-002's controllers-only posture: app pods carry no AWS
+# IAM at all, the provider fetches on their behalf. SecretProviderClasses
+# in k8s/ therefore must NOT set usePodIdentity.
 resource "aws_eks_pod_identity_association" "secrets_csi" {
   cluster_name    = aws_eks_cluster.this.name
   namespace       = "kube-system"
-  service_account = "secrets-store-csi-driver"
+  service_account = "csi-secrets-store-provider-aws"
   role_arn        = aws_iam_role.this_controller.arn
 
   tags = var.common_tags

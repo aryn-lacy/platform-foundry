@@ -29,7 +29,8 @@ Flyway). A rollback after a schema-changing release may need
 `ddl-auto` compatibility — expand-only changes roll back cleanly;
 contract changes need a forward fix. The production posture — Flyway
 pinned, `ddl-auto=validate`, migrations as a pre-rollout pipeline gate —
-is the recommendation carried in the architecture doc's roadmap.
+is the standing recommendation of this runbook: adopt it before any
+schema-bearing workload runs here.
 
 ## Escalation path
 

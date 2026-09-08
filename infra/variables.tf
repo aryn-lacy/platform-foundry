@@ -58,13 +58,13 @@ variable "endpoint_private_access" {
 }
 
 variable "allowed_api_cidrs" {
-  description = "CIDRs permitted to reach the EKS public API endpoint (only meaningful when endpoint_public_access=true — e.g. corporate egress ranges). Landing-zone-provided per environment; empty = public endpoint rejects all sources."
+  description = "CIDRs permitted to reach the EKS public API endpoint. Only meaningful when endpoint_public_access=true (validation enforces non-empty then). WARNING: AWS treats an empty list as 0.0.0.0/0 — this variable must never be left empty with public access enabled."
   type        = list(string)
   default     = []
 
   validation {
-    condition     = var.endpoint_public_access || length(var.allowed_api_cidrs) == 0
-    error_message = "allowed_api_cidrs is only meaningful with endpoint_public_access=true."
+    condition     = !var.endpoint_public_access || length(var.allowed_api_cidrs) > 0
+    error_message = "endpoint_public_access=true requires a non-empty allowed_api_cidrs (AWS defaults an empty list to 0.0.0.0/0)."
   }
 }
 
