@@ -1,0 +1,71 @@
+# Promotion gate: validates dev->prod tag-move PRs (the promotion flow's
+# enforcement). A prod-overlay PR is legal only if it moves image tags
+# that already ran in dev — no other shape changes, no unseen tags.
+# Reads repository files only; no cloud credentials.
+name: tag-promotion
+
+on:
+  pull_request:
+    paths:
+      - "k8s/*/overlays/prod/**"
+      - ".github/workflows/tag-promotion.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-promotion:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate the promotion shape
+        run: |
+          set -eu
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          # 1. Only k8s/*/overlays/prod/** files may change
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep -v '^\.github/' || true)
+          BAD=$(echo "$CHANGED" | grep -vE '^k8s/(backend|frontend|keycloak|analysis|bootstrap)/overlays/prod/' || true)
+          if [ -n "$BAD" ]; then
+            echo "::error::Promotion PRs may only touch prod overlays — also changed:"
+            echo "$BAD"
+            exit 1
+          fi
+          if [ -z "$CHANGED" ]; then
+            echo "No prod-overlay changes — nothing to validate."
+            exit 0
+          fi
+
+          # 2. Diff must only MOVE image tags (newTag value changes) or
+          #    placeholder image references — no structural additions
+          STRUCT=$(git diff "$BASE" "$HEAD" -- $CHANGED | grep -E '^[+-]' | grep -vE '^[+-]{3}' | grep -vE '^[+-]\s*(newTag|tag):' || true)
+          if [ -n "$STRUCT" ]; then
+            echo "::error::Promotion diff contains more than tag moves:"
+            echo "$STRUCT"
+            exit 1
+          fi
+
+          # 3. Every new tag must already exist in the same workload's dev overlay
+          #    (placeholder-to-placeholder counts as no promotion in flight)
+          fail=0
+          for f in $CHANGED; do
+            workload=$(echo "$f" | cut -d/ -f2)
+            devf="k8s/$workload/overlays/dev/kustomization.yaml"
+            [ -f "$devf" ] || devf=$(ls k8s/$workload/overlays/dev/*.yaml 2>/dev/null | head -1)
+            for tag in $(git diff "$BASE" "$HEAD" -- "$f" | grep -E '^\+\s*(newTag|tag):' | sed -E 's/^[+]\s*(newTag|tag):\s*//'); do
+              if echo "$tag" | grep -q placeholder; then
+                echo "placeholder tag in $f — no promotion in flight, ok"
+                continue
+              fi
+              if ! grep -rq "$tag" "k8s/$workload/overlays/dev/"; then
+                echo "::error::$f promotes tag '$tag' but it does not appear in k8s/$workload/overlays/dev/ — deploy to dev first"
+                fail=1
+              else
+                echo "$f: tag '$tag' found in dev overlay — legal promotion"
+              fi
+            done
+          done
+          exit $fail
