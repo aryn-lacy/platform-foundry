@@ -85,7 +85,7 @@ jobs:
           # the trivy DB that are NOT yet published to Maven Central
           # (10.1.55 is the newest 10.1.x artifact; 10.1.56+ absent) —
           # unfixable until Apache ships. Tracked for revisit.
-          ignorefile: .trivyignore
+          trivyignores: apps/backend/.trivyignore
 
   push-and-set-image:
     # Push + deploy-record commit — main pushes only; individual steps
