@@ -1,6 +1,9 @@
 # Secrets Manager, AWS-native end to end (ADR: no third-party secret store).
 # Pods consume these via the Secrets Store CSI driver (SecretProviderClass in
 # k8s/*/base) — never via plain env-var manifests, never via git.
+#
+# Tier split mirrors ADR-008: app and keycloak have separate instances,
+# separate endpoints, separate break-glass master credentials.
 
 resource "random_password" "keycloak_admin" {
   length  = 24
@@ -17,7 +20,12 @@ resource "random_password" "app_db" {
   special = false
 }
 
-# --- application database credentials ---------------------------------
+resource "random_password" "keycloak_client" {
+  length  = 32
+  special = false
+}
+
+# --- application database credentials (app instance) -------------------
 resource "aws_secretsmanager_secret" "app_db" {
   name = "${var.project_name}/${terraform.workspace}/app-db"
   tags = var.common_tags
@@ -28,14 +36,14 @@ resource "aws_secretsmanager_secret_version" "app_db" {
   secret_string = jsonencode({
     username = "realworld_app"
     password = random_password.app_db.result
-    host     = var.db_endpoint
-    port     = var.db_port
+    host     = var.db_endpoints.app.host
+    port     = var.db_endpoints.app.port
     dbname   = var.app_db_name
     engine   = "postgres"
   })
 }
 
-# --- keycloak database credentials ------------------------------------
+# --- keycloak database credentials (identity instance) ------------------
 resource "aws_secretsmanager_secret" "keycloak_db" {
   name = "${var.project_name}/${terraform.workspace}/keycloak-db"
   tags = var.common_tags
@@ -46,16 +54,11 @@ resource "aws_secretsmanager_secret_version" "keycloak_db" {
   secret_string = jsonencode({
     username = "keycloak"
     password = random_password.keycloak_db.result
-    host     = var.db_endpoint
-    port     = var.db_port
+    host     = var.db_endpoints.keycloak.host
+    port     = var.db_endpoints.keycloak.port
     dbname   = var.keycloak_db_name
     engine   = "postgres"
   })
-}
-
-resource "random_password" "keycloak_client" {
-  length  = 32
-  special = false
 }
 
 # --- keycloak admin credentials ---------------------------------------
@@ -86,24 +89,27 @@ resource "aws_secretsmanager_secret_version" "keycloak_client" {
   })
 }
 
-# --- rds master credential (break-glass) ------------------------------
-# The instance master password is generated in modules/database and
-# lifecycle-ignored there (rotation is not plan-driven). It is materialized
-# here — exactly once — as the break-glass credential. Without this the
-# master password existed only in state: recoverable, but undiscoverable.
+# --- rds master credentials (break-glass, one per tier) ---------------
+# Each instance's master password is generated in modules/database and
+# lifecycle-ignored there (rotation is not plan-driven). Each is
+# materialized here — exactly once — as its tier's break-glass credential.
 
 resource "aws_secretsmanager_secret" "db_master" {
-  name = "${var.project_name}/${terraform.workspace}/db-master"
+  for_each = toset(["app", "keycloak"])
+
+  name = "${var.project_name}/${terraform.workspace}/db-master-${each.key}"
   tags = var.common_tags
 }
 
 resource "aws_secretsmanager_secret_version" "db_master" {
-  secret_id = aws_secretsmanager_secret.db_master.id
+  for_each = aws_secretsmanager_secret.db_master
+
+  secret_id = each.value.id
   secret_string = jsonencode({
     username = "foundry_admin"
-    password = var.db_master_password
-    host     = var.db_endpoint
-    port     = var.db_port
+    password = var.db_master_passwords[each.key]
+    host     = var.db_endpoints[each.key].host
+    port     = var.db_endpoints[each.key].port
     engine   = "postgres"
   })
 
@@ -131,7 +137,8 @@ data "aws_iam_policy_document" "csi_read" {
       aws_secretsmanager_secret.keycloak_db.arn,
       aws_secretsmanager_secret.keycloak_admin.arn,
       aws_secretsmanager_secret.keycloak_client.arn,
-      aws_secretsmanager_secret.db_master.arn,
+      aws_secretsmanager_secret.db_master["app"].arn,
+      aws_secretsmanager_secret.db_master["keycloak"].arn,
     ]
   }
 }

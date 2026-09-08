@@ -7,8 +7,9 @@ az_count   = 3
 
 kubernetes_version = "1.36"
 
-db_instance_class        = "db.t4g.large"
-db_deletion_protection   = true
-db_backup_retention_days = 30
+db_instance_class_app      = "db.t4g.large"
+db_instance_class_keycloak = "db.t4g.medium"
+db_deletion_protection     = true
+db_backup_retention_days   = 30
 
 common_tags = { Tier = "prod" }

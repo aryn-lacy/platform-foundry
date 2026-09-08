@@ -7,6 +7,7 @@ az_count   = 3
 
 kubernetes_version = "1.36"
 
-db_instance_class        = "db.t4g.medium"
-db_deletion_protection   = false
-db_backup_retention_days = 7
+db_instance_class_app      = "db.t4g.medium"
+db_instance_class_keycloak = "db.t4g.small"
+db_deletion_protection     = false
+db_backup_retention_days   = 7

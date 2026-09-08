@@ -67,10 +67,16 @@ variable "allowed_api_cidrs" {
 # RDS
 # ------------------------------------------------------------------
 
-variable "db_instance_class" {
-  description = "RDS instance class. Sized per environment in tfvars."
+variable "db_instance_class_app" {
+  description = "RDS instance class for the application tier. Sized per environment in tfvars."
   type        = string
   default     = "db.t4g.medium"
+}
+
+variable "db_instance_class_keycloak" {
+  description = "RDS instance class for the identity (Keycloak) tier. Sized per environment in tfvars."
+  type        = string
+  default     = "db.t4g.small"
 }
 
 variable "db_backup_retention_days" {

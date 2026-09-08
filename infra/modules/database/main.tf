@@ -1,20 +1,41 @@
-# One instance, two databases (ADR-007-adjacent cost decision, documented in
-# docs/decisions/): the RealWorld app database and Keycloak's database share
-# a Multi-AZ PostgreSQL instance.
+# Two RDS PostgreSQL instances — identity tier isolated from application
+# tier (ADR-008). Keycloak's storage shares nothing with the application's:
+# separate instance, separate compute/storage, separate backup estate,
+# independent maintenance and restore granularity.
 #
-# Credential flow (full picture):
-# - random_password.master (below) IS the instance master credential: it
+# Alternative considered and rejected for this reference posture: a single
+# shared instance with two logical databases (cheaper; couples IdP and app
+# blast radius). That remains the choice for genuinely cost-constrained
+# deployments — the trade is documented, not hidden.
+#
+# Credential flow (per instance, full picture):
+# - random_password.master[tier] IS that instance's master credential: it
 #   sets the RDS password at creation and is materialized exactly once by
-#   modules/secrets as the break-glass `db-master` secret.
-# - Per-service credentials (realworld_app, keycloak roles) are generated
-#   and staged in Secrets Manager by modules/secrets — but the Postgres
-#   ROLES themselves are created by the Phase-3 bootstrap Job (see the
-#   deferred-entities note below), which connects as master via CSI-mounted
-#   db-master and creates each role with its already-staged password.
-# - Workload pods then connect with their own least-privilege credentials
-#   (Secrets Store CSI); the master credential returns to break-glass duty.
+#   modules/secrets as the break-glass db-master-<tier> secret.
+# - Each instance creates its own database (db_name) and master user. The
+#   least-privilege service ROLES (realworld_app on app, keycloak on
+#   keycloak) are created by the Phase-3 bootstrap Job, which connects as
+#   each master via CSI-mounted break-glass secrets and creates the role
+#   with its already-staged password.
+# - Workload pods then connect with their own roles; masters return to
+#   break-glass duty.
+
+locals {
+  instances = {
+    app = {
+      db_name        = "realworld_app"
+      instance_class = var.instance_classes["app"]
+    }
+    keycloak = {
+      db_name        = "keycloak"
+      instance_class = var.instance_classes["keycloak"]
+    }
+  }
+}
 
 resource "random_password" "master" {
+  for_each = local.instances
+
   length  = 24
   special = false
 }
@@ -25,6 +46,9 @@ resource "aws_db_subnet_group" "this" {
   tags       = var.common_tags
 }
 
+# One security group shared by both instances: the network rule is identical
+# (5432 from the VPC). Tier isolation is at the instance level — a shared SG
+# does not couple the tiers any more than shared subnets do.
 resource "aws_security_group" "db" {
   name_prefix = "${var.project_name}-${terraform.workspace}-db-"
   vpc_id      = var.vpc_id
@@ -40,15 +64,17 @@ resource "aws_security_group" "db" {
   tags = var.common_tags
 }
 
-resource "aws_db_instance" "postgres" {
-  identifier     = "${var.project_name}-${terraform.workspace}"
+resource "aws_db_instance" "this" {
+  for_each = local.instances
+
+  identifier     = "${var.project_name}-${terraform.workspace}-${each.key}"
   engine         = "postgres"
   engine_version = "16.4"
-  instance_class = var.instance_class
+  instance_class = each.value.instance_class
 
-  db_name  = "realworld_app"
+  db_name  = each.value.db_name
   username = "foundry_admin"
-  password = random_password.master.result
+  password = random_password.master[each.key].result
 
   db_subnet_group_name   = aws_db_subnet_group.this.name
   vpc_security_group_ids = [aws_security_group.db.id]
@@ -60,7 +86,7 @@ resource "aws_db_instance" "postgres" {
   storage_encrypted         = true
   deletion_protection       = var.deletion_protection
   skip_final_snapshot       = false
-  final_snapshot_identifier = "${var.project_name}-${terraform.workspace}-final"
+  final_snapshot_identifier = "${var.project_name}-${terraform.workspace}-${each.key}-final"
 
   backup_retention_period = var.backup_retention_days # daily automated backups (requirement)
   backup_window           = var.backup_window
@@ -70,7 +96,7 @@ resource "aws_db_instance" "postgres" {
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
   performance_insights_enabled    = true
 
-  tags = var.common_tags
+  tags = merge(var.common_tags, { Tier = each.key })
 
   lifecycle {
     # Set once by random_password at creation; ignoring drift means a
@@ -81,16 +107,11 @@ resource "aws_db_instance" "postgres" {
   }
 }
 
-# Second database on the shared instance: keycloak.
-# NOTE on deferred database entities: PostgreSQL RDS creates ONE database
-# per instance via db_name, and only the master user (foundry_admin) is
-# provisioned by the instance itself. THREE entities are deferred to the
-# Phase-3 bootstrap Job (k8s/, one-shot post-provisioning):
-#   1. the `keycloak` database
-#   2. the `keycloak` PostgreSQL role (password: Secrets Manager keycloak-db)
-#   3. the `realworld_app` PostgreSQL role (password: Secrets Manager app-db)
-# Until that Job runs, the Secrets Manager app/keycloak credentials are
-# staged but not yet usable — by design, not by accident. Instance-level
-# concerns (Multi-AZ, backups, encryption) cover both databases equally.
-# This comment is the contract; removing it requires updating
-# docs/architecture.md.
+# NOTE on deferred entities (the Phase-3 bootstrap Job contract):
+# Each instance provisions its own database and the master user. The
+# bootstrap Job creates exactly TWO roles, one per instance:
+#   1. `realworld_app` role on the app instance (password: app-db secret)
+#   2. `keycloak` role on the keycloak instance (password: keycloak-db secret)
+# Until that Job runs, the service-role credentials are staged but not yet
+# usable — by design, not by accident. This comment is the contract;
+# removing it requires updating docs/architecture.md.

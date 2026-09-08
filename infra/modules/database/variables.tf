@@ -2,8 +2,9 @@ variable "project_name" {
   type = string
 }
 
-variable "instance_class" {
-  type = string
+variable "instance_classes" {
+  description = "Per-tier RDS instance classes (app, keycloak). Sized per environment in tfvars."
+  type        = map(string)
 }
 
 variable "vpc_id" {

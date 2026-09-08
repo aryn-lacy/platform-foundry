@@ -34,9 +34,14 @@ output "cluster_oidc_issuer_url" {
   value       = module.eks.cluster_oidc_issuer_url
 }
 
-output "database_connection_endpoint" {
-  description = "RDS writer endpoint (host:port)."
-  value       = module.rds_postgres.connection_endpoint
+output "app_database_endpoint" {
+  description = "App-tier RDS writer endpoint (host:port)."
+  value       = "${module.rds_postgres.app_endpoint_host}:${module.rds_postgres.app_endpoint_port}"
+}
+
+output "keycloak_database_endpoint" {
+  description = "Identity-tier RDS writer endpoint (host:port)."
+  value       = "${module.rds_postgres.keycloak_endpoint_host}:${module.rds_postgres.keycloak_endpoint_port}"
 }
 
 output "app_database_name" {
