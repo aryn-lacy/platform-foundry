@@ -11,5 +11,6 @@ Numbered, dated, one decision each. Status: one of `accepted`, `superseded`.
 | 005 | Canary + AnalysisTemplate + k6 in CI | planned (P6) |
 | 006 | Mesh mTLS deferred | planned (P6) |
 | 007 | No cache tier (yet) | planned (P6) |
+| 008 | Two RDS instances — identity tier isolated from app tier | accepted (P2) |
 
 Files land with Phase 6 (`#6`).
