@@ -15,11 +15,16 @@ import org.testcontainers.utility.MountableFile;
 /**
  * Platform integration test (ours, not upstream's): boots the full Spring
  * context against ephemeral Postgres + Keycloak via Testcontainers — the
- * same dependencies the docker-compose stack provides locally and EKS
- * provides in production. Keycloak imports a minimal realworld realm
+ * same dependency set the docker-compose stack provides locally and EKS
+ * provides in production.
+ *
+ * The app resolves EVERY config value from environment placeholders (see
+ * .env.template) — in production they arrive via the Secrets Store CSI
+ * driver. The test supplies the full env surface, mirroring that contract:
+ * only the Keycloak URL, datasource coordinates, and issuer differ (they
+ * point at the containers). Keycloak imports a minimal realworld realm
  * (realm + realworld-backend client), mirroring the platform's
- * realm-as-code posture, so the resource server's issuer-uri validation
- * resolves real OIDC discovery endpoints.
+ * realm-as-code posture, so OIDC discovery resolves.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -48,22 +53,37 @@ class PlatformIntegrationTests {
 
     @DynamicPropertySource
     static void registerProps(DynamicPropertyRegistry registry) {
+        String keycloakUrl =
+                "http://%s:%d".formatted(keycloak.getHost(), keycloak.getFirstMappedPort());
+
+        // Full env surface (application.properties resolves all of these;
+        // values mirror .env.template / the compose stack)
+        registry.add("PORT", () -> "8080");
+        registry.add("KEYCLOAK_REALM", () -> "realworld");
+        registry.add("KEYCLOAK_REALM_ADMIN", () -> "realworld_admin");
+        registry.add("KEYCLOAK_REALM_ADMIN_PASSWORD", () -> "realworld_admin");
+        registry.add("KEYCLOAK_REALM_CLIENT_ID", () -> "realworld-backend");
+        registry.add("KEYCLOAK_REALM_CLIENT_SECRET", () -> "test-client-secret");
+        registry.add("KEYCLOAK_SERVER_URL", () -> keycloakUrl);
+        registry.add("APP_DB", () -> "realworld");
+        registry.add("APP_DB_USERNAME", () -> "realworld");
+        registry.add("APP_DB_PASSWORD", () -> "realworld");
+
+        // Container-resolved coordinates (higher precedence than the
+        // placeholder-composed values in application.properties)
         registry.add(
                 "spring.datasource.url",
                 () -> "jdbc:postgresql://%s:%d/realworld"
                         .formatted(postgres.getHost(), postgres.getFirstMappedPort()));
-        registry.add("spring.datasource.username", () -> "realworld");
-        registry.add("spring.datasource.password", () -> "realworld");
         registry.add(
                 "spring.security.oauth2.resourceserver.jwt.issuer-uri",
-                () -> "http://%s:%d/realms/realworld"
-                        .formatted(keycloak.getHost(), keycloak.getFirstMappedPort()));
+                () -> "%s/realms/realworld".formatted(keycloakUrl));
     }
 
     @Test
     void contextLoadsWithRealDependencies() {
         // The Spring context loading IS the test: datasource connects,
         // the JWT issuer URI resolves against live Keycloak (realm
-        // imported), and every bean wires.
+        // imported), and every bean wires against the full env contract.
     }
 }
