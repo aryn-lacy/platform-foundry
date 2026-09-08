@@ -21,15 +21,17 @@ Identity token for credentials. Consequences:
 
 - A controller- or provider-level association is **dead code** — the
   provider SA is never the identity.
-- Associations must be **per workload** (backend, keycloak), created when
-  the workloads land (Phase 3), each bound to one shared read-scoped role.
+- Associations must be **per workload** (backend, keycloak, db-bootstrap),
+  provisioned in `modules/eks` via the root's `workload_associations` map,
+  each bound to one shared read-scoped role.
 
 ## Decision
 
 EKS Pod Identity. One IAM role (`modules/eks`), read-scoped by the CSI
 policy (6 secret ARNs). Per-workload `aws_eks_pod_identity_association`
-resources land with the workloads in Phase 3, alongside
-SecretProviderClasses that set `usePodIdentity: "true"`.
+resources are provisioned in `modules/eks`, driven by the
+`workload_associations` map instantiated at the root (`infra/eks.tf`);
+the workloads' SecretProviderClasses set `usePodIdentity: "true"`.
 
 ## The accurate posture (replacing the earlier "zero IAM" claim)
 

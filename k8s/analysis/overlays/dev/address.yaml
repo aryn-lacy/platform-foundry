@@ -1,0 +1,11 @@
+# Assumed platform Prometheus (A3) — per landing zone. Applied to BOTH
+# templates by the target selector; metadata.name is required for the
+# strategic-merge patch (the name is a no-op for selection).
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: backend-error-rate
+spec:
+  args:
+    - name: prometheus-address
+      value: http://prometheus.platform-dev.svc:9090

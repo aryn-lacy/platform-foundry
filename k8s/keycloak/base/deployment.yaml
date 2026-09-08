@@ -1,0 +1,145 @@
+# Keycloak: stock image, configured not built. Lean realm-as-code — the
+# realm JSON (realm + realworld-backend client + redirect URI) is imported
+# at boot via --import-realm. Startup probe generous: Keycloak is a
+# slow-starting JVM (ADR-002 story) — up to 5 minutes warm-up budget.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      serviceAccountName: keycloak
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: keycloak
+      containers:
+        - name: keycloak
+          image: keycloak
+          # Entrypoint wrapper: substitute the real client secret into the
+          # realm before import (the mounted file is read-only; we work on
+          # a copy in the writable data dir). No placeholder ever ships.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              mkdir -p /opt/keycloak/data/import
+              CLIENT_SECRET=$(cat /mnt/secrets/keycloak/clientsecret)
+              # single-quoted pattern matches the literal ${...} token in the
+              # realm JSON; the replacement splices the variable via quote
+              # concatenation — no $$ (PID expansion), no wrapper residue.
+              # | delimiter avoids clashes with / in the secret; the value
+              # is alnum-only by construction (random_password, special=false).
+              sed 's|${REALM_PLACEHOLDER_CLIENT_SECRET}|'"$CLIENT_SECRET"'|g' \
+                /opt/keycloak/data/import-src/realm.json \
+                > /opt/keycloak/data/import/realm.json
+              exec /opt/keycloak/bin/kc.sh start --import-realm
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin
+                  key: username
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin
+                  key: password
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db
+                  key: host
+            - name: KC_DB_URL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db
+                  key: dbname
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db
+                  key: username
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db
+                  key: password
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /realms/master
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /realms/master
+              port: http
+            periodSeconds: 20
+          startupProbe:
+            httpGet:
+              path: /realms/master
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60 # up to 5 minutes JVM warm-up
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: data
+              mountPath: /opt/keycloak/data
+            - name: realm
+              mountPath: /opt/keycloak/data/import-src
+              readOnly: true
+            - name: secrets
+              mountPath: /mnt/secrets/keycloak
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: data
+          emptyDir: {} # writable data dir under read-only rootfs
+        - name: realm
+          configMap:
+            name: keycloak-realm
+        - name: secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: keycloak

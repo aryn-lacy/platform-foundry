@@ -1,0 +1,82 @@
+# Default-deny for the backend, then explicit allows only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-default-deny
+  namespace: conduit
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: [Ingress, Egress]
+---
+# Ingress: frontend -> backend (the only in-cluster caller).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-allow-frontend
+  namespace: conduit
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Prometheus scrape from the (assumed) observability plane namespace —
+    # without this the canary AnalysisTemplate passes vacuously on no-data.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: platform-observability
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Egress: DNS, keycloak (token validation + admin client), and nothing else
+# in-cluster. Database egress leaves the cluster (SG-scoped at the VPC).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-allow-egress
+  namespace: conduit
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Database: the app-tier RDS endpoint lives in the VPC (outside the
+    # cluster) — pod-level egress must explicitly allow it; the security
+    # group alone cannot un-deny a NetworkPolicy default-deny.
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8 # VPC/Landing-zone supernet placeholder — overlay-resolved
+      ports:
+        - protocol: TCP
+          port: 5432

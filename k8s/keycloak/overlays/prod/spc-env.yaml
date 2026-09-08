@@ -1,0 +1,31 @@
+# Env-specific secret paths: prod tier
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: keycloak
+spec:
+  parameters:
+    objects: |
+      - objectName: "platform-foundry/prod/keycloak-db"
+        type: secretsmanager
+        jmesPath:
+          - path: username
+            objectAlias: dbuser
+          - path: password
+            objectAlias: dbpassword
+          - path: host
+            objectAlias: dbhost
+          - path: dbname
+            objectAlias: dbname
+      - objectName: "platform-foundry/prod/keycloak-admin"
+        type: secretsmanager
+        jmesPath:
+          - path: username
+            objectAlias: adminuser
+          - path: password
+            objectAlias: adminpassword
+      - objectName: "platform-foundry/prod/keycloak-client"
+        type: secretsmanager
+        jmesPath:
+          - path: clientsecret
+            objectAlias: clientsecret

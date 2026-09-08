@@ -137,7 +137,9 @@ resource "aws_eks_addon" "cloudwatch_observability" {
 }
 
 # ------------------------------------------------------------------
-# Pod Identity: controller role (ADR-002 — app pods carry no AWS IAM)
+# Pod Identity: shared read-scoped role (ADR-002, revised — per-workload
+# associations borrow this role at mount time; app pods hold no
+# credentials, SDK, or AWS API calls; their SAs carry the association)
 # ------------------------------------------------------------------
 
 data "aws_iam_policy_document" "pod_identity_trust" {
@@ -158,10 +160,11 @@ data "aws_iam_policy_document" "pod_identity_trust" {
 # and exchanges that SA's Pod Identity token). Therefore:
 #   - There is NO controller-level association to create here. A
 #     provider-SA association would be dead code.
-#   - Associations are PER WORKLOAD (backend, keycloak) and land with the
-#     workloads themselves in Phase 3, when their namespaces/service
-#     accounts exist: one aws_eks_pod_identity_association each, bound to
-#     this role, with usePodIdentity: "true" in the SecretProviderClass.
+#   - Associations are PER WORKLOAD (backend, keycloak), provisioned HERE
+#     in this module via the workload_associations map supplied at the
+#     root (infra/eks.tf). Declarative bindings: the referenced
+#     namespaces/SAs may not exist yet — each SecretProviderClass sets
+#     usePodIdentity: "true" to use them once the workloads land.
 #   - App pods hold no AWS credentials, ship no AWS SDK, and make no AWS
 #     calls; their SAs carry this read-scoped association, which ASCP
 #     borrows. "Zero IAM" was the wrong claim — "zero credentials, zero
@@ -170,4 +173,21 @@ resource "aws_iam_role" "this_controller" {
   name               = "${var.project_name}-${terraform.workspace}-podid"
   assume_role_policy = data.aws_iam_policy_document.pod_identity_trust.json
   tags               = var.common_tags
+}
+
+# Per-workload associations (ADR-002, revised): each mounting workload's
+# service account bound to the shared read-scoped role above. Declarative
+# bindings — the referenced namespace/SA need not exist yet (inert until
+# the first pod using that SA requests a token). The read policy is
+# attached at the root (infra/eks.tf). SecretProviderClasses must set
+# usePodIdentity: "true" for these to be used.
+resource "aws_eks_pod_identity_association" "workload" {
+  for_each = var.workload_associations
+
+  cluster_name    = aws_eks_cluster.this.name
+  namespace       = each.value.namespace
+  service_account = each.value.service_account
+  role_arn        = aws_iam_role.this_controller.arn
+
+  tags = merge(var.common_tags, { Workload = each.key })
 }

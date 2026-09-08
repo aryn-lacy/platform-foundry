@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-bootstrap
+  namespace: argocd
+spec:
+  project: platform-foundry
+  source:
+    repoURL: https://github.com/aryn-lacy/platform-foundry.git
+    targetRevision: main
+    path: k8s/bootstrap/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: foundry-bootstrap
+  syncPolicy:
+    # prod: no automated sync — the promotion PR merge is the trigger;
+    # sync is approved by a human or the tag-promotion workflow.
+    syncOptions:
+      - CreateNamespace=false
