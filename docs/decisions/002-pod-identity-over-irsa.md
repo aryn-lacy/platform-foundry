@@ -21,8 +21,9 @@ Identity token for credentials. Consequences:
 
 - A controller- or provider-level association is **dead code** — the
   provider SA is never the identity.
-- Associations must be **per workload** (backend, keycloak), created when
-  the workloads land (Phase 3), each bound to one shared read-scoped role.
+- Associations must be **per workload** (backend, keycloak, db-bootstrap),
+  provisioned in `modules/eks` via the root's `workload_associations` map,
+  each bound to one shared read-scoped role.
 
 ## Decision
 
