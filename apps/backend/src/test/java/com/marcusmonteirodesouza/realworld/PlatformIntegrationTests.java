@@ -10,13 +10,16 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
 
 /**
  * Platform integration test (ours, not upstream's): boots the full Spring
  * context against ephemeral Postgres + Keycloak via Testcontainers — the
  * same dependencies the docker-compose stack provides locally and EKS
- * provides in production. This is the stage that proves the app's
- * Keycloak-native wiring (oauth2 resource server, datasource) is intact.
+ * provides in production. Keycloak imports a minimal realworld realm
+ * (realm + realworld-backend client), mirroring the platform's
+ * realm-as-code posture, so the resource server's issuer-uri validation
+ * resolves real OIDC discovery endpoints.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -38,7 +41,10 @@ class PlatformIntegrationTests {
                             "start-dev",
                             "--http-enabled=true",
                             "--hostname-strict=false",
-                            "--health-enabled=true");
+                            "--import-realm")
+                    .withCopyFileToContainer(
+                            MountableFile.forClasspathResource("realworld-realm.json"),
+                            "/opt/keycloak/data/import/realworld-realm.json");
 
     @DynamicPropertySource
     static void registerProps(DynamicPropertyRegistry registry) {
@@ -57,8 +63,7 @@ class PlatformIntegrationTests {
     @Test
     void contextLoadsWithRealDependencies() {
         // The Spring context loading IS the test: datasource connects,
-        // the JWT issuer URI resolves against live Keycloak, and every
-        // bean wires. Upstream's RealworldApplicationTests does the same
-        // but assumes the compose stack is already up.
+        // the JWT issuer URI resolves against live Keycloak (realm
+        // imported), and every bean wires.
     }
 }
