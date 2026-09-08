@@ -12,5 +12,7 @@ Numbered, dated, one decision each. Status: one of `accepted`, `superseded`.
 | 006 | Mesh mTLS deferred | planned (P6) |
 | 007 | No cache tier (yet) | planned (P6) |
 | 008 | Two RDS instances — identity tier isolated from app tier | accepted (P2) |
+| 009 | Hand-rolled modules over community module sources | accepted |
+| 010 | OpenTofu over Terraform — convenience + OSS CI ecosystem | accepted |
 
 Files land with Phase 6 (`#6`).
