@@ -13,8 +13,9 @@ spec:
     server: https://kubernetes.default.svc
     namespace: conduit # AnalysisTemplates are namespace-scoped: land where the Rollouts live
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+    # prod: gated like its siblings — no automated sync; the promotion PR
+    # merge is the trigger, sync approved by a human or the
+    # tag-promotion workflow. selfHeal here would let unreviewed
+    # successCondition/failureLimit changes reach prod automatically.
     syncOptions:
       - CreateNamespace=false

@@ -4,13 +4,13 @@ resources:
   - ../../base
 patches:
   - path: spc-env.yaml
+    target:
+      kind: SecretProviderClass
+      name: backend-db
   - path: profile-patch.yaml
     target:
       kind: Deployment
       name: backend
-    target:
-      kind: SecretProviderClass
-      name: backend-db
 images:
   # Placeholder account — the landing zone wiring replaces ACCOUNT_ID.
   # newTag is rewritten by CI (kustomize edit set image) on every build;

@@ -34,37 +34,46 @@ spec:
           args:
             - |
               set -eu
-              export PGPASSWORD
+              umask 077
+              # Secrets never ride argv (visible in /proc/<pid>/cmdline):
+              # passwords interpolate via unquoted heredocs into 0600 SQL
+              # files, psql reads them with -f, files are shredded after.
+              # Plain $VAR here is shell runtime expansion — the $$ trap is
+              # YAML-block-scalar-specific and absent by construction.
+
               # --- app tier ---
               PGPASSWORD=$(cat /mnt/secrets/masterapppassword)
               APP_PASS=$(cat /mnt/secrets/apppassword)
               APP_HOST=$(cat /mnt/secrets/apphost)
-              psql "host=$APP_HOST user=foundry_admin dbname=realworld_app sslmode=require" \
-                -v appass="$APP_PASS" <<'SQL'
-              DO $do$
+              cat > /tmp/app-role.sql <<EOF
+              DO \$do\$
               BEGIN
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'realworld_app') THEN
-                  CREATE ROLE realworld_app LOGIN PASSWORD :'appass';
+                  CREATE ROLE realworld_app LOGIN PASSWORD '$APP_PASS';
                 END IF;
               END
-              $do$;
+              \$do\$;
               GRANT ALL PRIVILEGES ON DATABASE realworld_app TO realworld_app;
-              SQL
+              EOF
+              psql "host=$APP_HOST user=foundry_admin dbname=realworld_app sslmode=require" -f /tmp/app-role.sql
+
               # --- keycloak tier ---
               PGPASSWORD=$(cat /mnt/secrets/masterkcpassword)
               KC_PASS=$(cat /mnt/secrets/kcpassword)
               KC_HOST=$(cat /mnt/secrets/kchost)
-              psql "host=$KC_HOST user=foundry_admin dbname=keycloak sslmode=require" \
-                -v kcpass="$KC_PASS" <<'SQL'
-              DO $do$
+              cat > /tmp/kc-role.sql <<EOF
+              DO \$do\$
               BEGIN
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'keycloak') THEN
-                  CREATE ROLE keycloak LOGIN PASSWORD :'kcpass';
+                  CREATE ROLE keycloak LOGIN PASSWORD '$KC_PASS';
                 END IF;
               END
-              $do$;
+              \$do\$;
               GRANT ALL PRIVILEGES ON DATABASE keycloak TO keycloak;
-              SQL
+              EOF
+              psql "host=$KC_HOST user=foundry_admin dbname=keycloak sslmode=require" -f /tmp/kc-role.sql
+
+              rm -f /tmp/app-role.sql /tmp/kc-role.sql
               echo "roles provisioned"
           securityContext:
             allowPrivilegeEscalation: false
