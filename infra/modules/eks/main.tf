@@ -137,7 +137,7 @@ resource "aws_eks_addon" "cloudwatch_observability" {
 }
 
 # ------------------------------------------------------------------
-# Pod Identity: controller roles (ADR-002 — app pods carry no AWS IAM)
+# Pod Identity: controller role (ADR-002 — app pods carry no AWS IAM)
 # ------------------------------------------------------------------
 
 data "aws_iam_policy_document" "pod_identity_trust" {
@@ -150,6 +150,22 @@ data "aws_iam_policy_document" "pod_identity_trust" {
   }
 }
 
+# Pod Identity + ASCP credential model (ADR-002, corrected):
+#
+# ASCP resolves AWS identity from the MOUNTING POD's service account —
+# never its own (verified in ASCP server/server.go: it reads
+# csi.storage.k8s.io/serviceAccount.name/.tokens from the mount request
+# and exchanges that SA's Pod Identity token). Therefore:
+#   - There is NO controller-level association to create here. A
+#     provider-SA association would be dead code.
+#   - Associations are PER WORKLOAD (backend, keycloak) and land with the
+#     workloads themselves in Phase 3, when their namespaces/service
+#     accounts exist: one aws_eks_pod_identity_association each, bound to
+#     this role, with usePodIdentity: "true" in the SecretProviderClass.
+#   - App pods hold no AWS credentials, ship no AWS SDK, and make no AWS
+#     calls; their SAs carry this read-scoped association, which ASCP
+#     borrows. "Zero IAM" was the wrong claim — "zero credentials, zero
+#     calls, read-only scoped association" is the accurate posture.
 resource "aws_iam_role" "this_controller" {
   name               = "${var.project_name}-${terraform.workspace}-podid"
   assume_role_policy = data.aws_iam_policy_document.pod_identity_trust.json

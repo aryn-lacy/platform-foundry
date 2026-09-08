@@ -13,12 +13,13 @@ k6 load profiles in CI; or combinations.
 
 Both, each honest about what it needs:
 
-- **k6 in CI** — real and executable: fixed VU profiles with thresholds
-  against a committed baseline; regression fails the build *before* rollout.
-  Depends on nothing but the endpoint.
-- **AnalysisTemplate** — declared in-cluster guard during rollout: canary
-  steps gated on error-rate/p95 queries against the **assumed** platform
-  Prometheus (A3). Fully written YAML; dependency documented, not hidden.
+- **k6 in CI** — real and executable once P5 lands: fixed VU profiles with
+  thresholds against a committed baseline; regression fails the build
+  *before* rollout. Depends on nothing but the endpoint.
+- **AnalysisTemplate** — declared in-cluster guard during rollout (P3):
+  canary steps gated on error-rate/p95 queries against the **assumed**
+  platform Prometheus (A3). The manifest is a deliverable of Phase 3;
+  dependency documented, not hidden.
 
 ## Consequences
 

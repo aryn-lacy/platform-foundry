@@ -24,12 +24,13 @@ The deployed state **is** the git commit. Rollback = revert:
 
 ## Database caveat
 
-Schema is application-managed in this reference (JPA; no Flyway — see the
-architecture doc's migration note). A rollback after a schema-changing
-release may need `ddl-auto` compatibility (expand-only changes roll back
-cleanly; contract changes need a forward fix). The production posture —
-Flyway pinned, `ddl-auto=validate`, migrations as a pipeline gate — is the
-documented recommendation.
+Schema is application-managed in this reference (JPA `ddl-auto`; no
+Flyway). A rollback after a schema-changing release may need
+`ddl-auto` compatibility — expand-only changes roll back cleanly;
+contract changes need a forward fix. The production posture — Flyway
+pinned, `ddl-auto=validate`, migrations as a pre-rollout pipeline gate —
+is the standing recommendation of this runbook: adopt it before any
+schema-bearing workload runs here.
 
 ## Escalation path
 
