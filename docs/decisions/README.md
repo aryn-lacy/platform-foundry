@@ -16,7 +16,10 @@ Numbered, dated, one decision each. Status: `accepted`, `superseded`, or `planne
 | 010 | [OpenTofu over Terraform](010-opentofu-over-terraform.md) | accepted |
 
 All ten decisions are reflected in code where they live:
-001/002 in `modules/eks`, 003 in the root + `envs/`, 004 in `modules/eks`
-(ACM listener) and the add-on set, 005 in `k8s/analysis/` (P3) + `k6/` (P5),
-006 in the NetworkPolicy posture, 008 in `modules/database`, 009 in
-`infra/modules/README.md`, 010 in `infra/versions.tf` + the Makefile.
+001/002 in `modules/eks` (Auto Mode config; Pod Identity role +
+association), 003 in the root + `envs/`, 004 in the TLS posture (ACM at
+the edge — the ALB itself is provisioned by Auto Mode's AWS-operated
+controller; the listener lands with the P3 ingress manifests), 005 in
+`k8s/analysis/` (P3) + `k6/` (P5), 006 in the NetworkPolicy posture
+(P3), 008 in `modules/database`, 009 in `infra/modules/README.md`, 010 in
+`infra/versions.tf` + the Makefile.

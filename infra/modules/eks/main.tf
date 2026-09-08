@@ -137,7 +137,7 @@ resource "aws_eks_addon" "cloudwatch_observability" {
 }
 
 # ------------------------------------------------------------------
-# Pod Identity: controller roles (ADR-002 — app pods carry no AWS IAM)
+# Pod Identity: controller role (ADR-002 — app pods carry no AWS IAM)
 # ------------------------------------------------------------------
 
 data "aws_iam_policy_document" "pod_identity_trust" {
@@ -154,4 +154,17 @@ resource "aws_iam_role" "this_controller" {
   name               = "${var.project_name}-${terraform.workspace}-podid"
   assume_role_policy = data.aws_iam_policy_document.pod_identity_trust.json
   tags               = var.common_tags
+}
+
+# Secrets Store CSI driver: the ONE Pod Identity consumer (ADR-002). The
+# load balancer controller is AWS-operated under Auto Mode and holds no
+# pod-identity association. Namespace/name pinned to the EKS add-on's
+# deployment; read policy attached at the root (infra/eks.tf).
+resource "aws_eks_pod_identity_association" "secrets_csi" {
+  cluster_name    = aws_eks_cluster.this.name
+  namespace       = "kube-system"
+  service_account = "secrets-store-csi-driver"
+  role_arn        = aws_iam_role.this_controller.arn
+
+  tags = var.common_tags
 }

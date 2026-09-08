@@ -46,9 +46,9 @@ variable "kubernetes_version" {
 }
 
 variable "endpoint_public_access" {
-  description = "Expose the EKS API endpoint publicly. Landing-zone bastion/VPN access is the alternative."
+  description = "Expose the EKS API endpoint publicly. Off by default — the landing zone is expected to provide private connectivity (TGW/VPN); enable per environment with a CIDR allow-list."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "endpoint_private_access" {
@@ -58,9 +58,14 @@ variable "endpoint_private_access" {
 }
 
 variable "allowed_api_cidrs" {
-  description = "CIDRs permitted to reach the EKS public API endpoint. Landing-zone corporate egress ranges, provided per environment."
+  description = "CIDRs permitted to reach the EKS public API endpoint (only meaningful when endpoint_public_access=true — e.g. corporate egress ranges). Landing-zone-provided per environment; empty = public endpoint rejects all sources."
   type        = list(string)
   default     = []
+
+  validation {
+    condition     = var.endpoint_public_access || length(var.allowed_api_cidrs) == 0
+    error_message = "allowed_api_cidrs is only meaningful with endpoint_public_access=true."
+  }
 }
 
 # ------------------------------------------------------------------

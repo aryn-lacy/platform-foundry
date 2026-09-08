@@ -66,7 +66,8 @@ hand-rolled modules ([ADR-009](decisions/009-hand-rolled-modules.md)).
   nodes, load balancer controller, and storage are AWS-operated. Add-ons:
   `eks-pod-identity-agent`, `aws-secrets-store-csi-driver-provider`,
   `amazon-cloudwatch-observability`, community `metrics-server`, `adot`.
-  Control plane: **private subnets only**. Workload identity:
+  Control plane: **private endpoint by default** (public access off unless an
+  environment explicitly enables it with a CIDR allow-list). Workload identity:
   **Pod Identity for controllers only** — app pods carry zero AWS IAM
   ([ADR-002](decisions/002-pod-identity-over-irsa.md)).
 - **Data** — **two RDS PostgreSQL Multi-AZ instances**
@@ -151,7 +152,7 @@ Ship it, don't host it ([assumption A3](assumptions.md)):
 |---|---|
 | Workload identity | Pod Identity, controllers only; app pods = zero AWS IAM |
 | Secrets | Secrets Manager + CSI (6-ARN read policy); break-glass masters lifecycle-frozen; nothing in git |
-| Network | Private control plane; default-deny east-west NPs; SG-scoped data tier; TLS terminates at ACM on the ALB |
+| Network | Private subnets; endpoint private by default (public opt-in + CIDR allow-list); default-deny east-west NPs; SG-scoped data tier; TLS terminates at ACM on the ALB |
 | Supply chain | Immutable ECR tags; scan-on-push; Trivy gate in CI; dependabot |
 | Policy | tfsec/checkov + conftest/OPA, pre-merge |
 | Known boundary | East-west is plaintext inside the NP boundary — zero-trust roadmap: Istio ambient / VPC Lattice ([ADR-006](decisions/006-mesh-mtls-deferred.md)) |
