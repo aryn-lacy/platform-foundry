@@ -6,8 +6,12 @@
 #
 # Shell-safety: NO $${VAR} double-dollar syntax anywhere in this file —
 # in YAML block scalars $$ reaches bash literally and expands to the
-# PID. Plain $VAR reads from files are exported once, then passed to
-# psql via -v (server-side substitution).
+# PID. Secret handling:
+#   - PGPASSWORD is exported (libpq reads the environment; the value
+#     never appears on any argv / /proc/<pid>/cmdline).
+#   - Role passwords are SQL-escaped ('' doubling) before interpolating
+#     into 0600 heredoc SQL files; psql consumes them with -f.
+#   - SQL files are removed via an EXIT trap — on success AND failure.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -35,21 +39,20 @@ spec:
             - |
               set -eu
               umask 077
-              # Secrets never ride argv (visible in /proc/<pid>/cmdline):
-              # passwords interpolate via unquoted heredocs into 0600 SQL
-              # files, psql reads them with -f, files are shredded after.
+              trap 'rm -f /tmp/app-role.sql /tmp/kc-role.sql' EXIT
               # Plain $VAR here is shell runtime expansion — the $$ trap is
               # YAML-block-scalar-specific and absent by construction.
 
               # --- app tier ---
-              PGPASSWORD=$(cat /mnt/secrets/masterapppassword)
+              export PGPASSWORD=$(cat /mnt/secrets/masterapppassword)
               APP_PASS=$(cat /mnt/secrets/apppassword)
               APP_HOST=$(cat /mnt/secrets/apphost)
+              APP_PASS_SQL=$(printf '%s' "$APP_PASS" | sed "s/'/''/g")
               cat > /tmp/app-role.sql <<EOF
               DO \$do\$
               BEGIN
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'realworld_app') THEN
-                  CREATE ROLE realworld_app LOGIN PASSWORD '$APP_PASS';
+                  CREATE ROLE realworld_app LOGIN PASSWORD '$APP_PASS_SQL';
                 END IF;
               END
               \$do\$;
@@ -58,14 +61,15 @@ spec:
               psql "host=$APP_HOST user=foundry_admin dbname=realworld_app sslmode=require" -f /tmp/app-role.sql
 
               # --- keycloak tier ---
-              PGPASSWORD=$(cat /mnt/secrets/masterkcpassword)
+              export PGPASSWORD=$(cat /mnt/secrets/masterkcpassword)
               KC_PASS=$(cat /mnt/secrets/kcpassword)
               KC_HOST=$(cat /mnt/secrets/kchost)
+              KC_PASS_SQL=$(printf '%s' "$KC_PASS" | sed "s/'/''/g")
               cat > /tmp/kc-role.sql <<EOF
               DO \$do\$
               BEGIN
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'keycloak') THEN
-                  CREATE ROLE keycloak LOGIN PASSWORD '$KC_PASS';
+                  CREATE ROLE keycloak LOGIN PASSWORD '$KC_PASS_SQL';
                 END IF;
               END
               \$do\$;
@@ -73,7 +77,6 @@ spec:
               EOF
               psql "host=$KC_HOST user=foundry_admin dbname=keycloak sslmode=require" -f /tmp/kc-role.sql
 
-              rm -f /tmp/app-role.sql /tmp/kc-role.sql
               echo "roles provisioned"
           securityContext:
             allowPrivilegeEscalation: false
