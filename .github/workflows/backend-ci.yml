@@ -55,7 +55,9 @@ jobs:
           cache: maven
       - name: "Integration tests (Testcontainers: keycloak + postgres)"
         working-directory: apps/backend
-        run: ./mvnw -B verify
+        # Only our PlatformIntegrationTests (real containers); upstream's
+        # context test is excluded from the plain unit stage above.
+        run: ./mvnw -B test -Dtest='PlatformIntegrationTests'
 
   build-scan:
     runs-on: ubuntu-latest
