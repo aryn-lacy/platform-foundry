@@ -32,7 +32,19 @@ spec:
       containers:
         - name: keycloak
           image: keycloak
-          args: ["start", "--import-realm"]
+          # Entrypoint wrapper: substitute the real client secret into the
+          # realm before import (the mounted file is read-only; we work on
+          # a copy in the writable data dir). No placeholder ever ships.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              mkdir -p /opt/keycloak/data/import
+              CLIENT_SECRET=$(cat /mnt/secrets/keycloak/clientsecret)
+              sed "s/REALM_PLACEHOLDER_CLIENT_SECRET/$${CLIENT_SECRET}/g" \
+                /opt/keycloak/data/import-src/realm.json \
+                > /opt/keycloak/data/import/realm.json
+              exec /opt/keycloak/bin/kc.sh start --import-realm
           env:
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
               valueFrom:
@@ -104,12 +116,25 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: data
+              mountPath: /opt/keycloak/data
             - name: realm
-              mountPath: /opt/keycloak/data/import
+              mountPath: /opt/keycloak/data/import-src
+              readOnly: true
+            - name: secrets
+              mountPath: /mnt/secrets/keycloak
               readOnly: true
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: data
+          emptyDir: {} # writable data dir under read-only rootfs
         - name: realm
           configMap:
             name: keycloak-realm
+        - name: secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: keycloak

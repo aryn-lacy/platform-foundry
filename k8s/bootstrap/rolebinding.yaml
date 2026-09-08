@@ -1,4 +1,4 @@
-# Allow the job to restart itself on re-run without escalating.
+# Read-only visibility on its own Job object (status polling); no restart verb — re-runs are a new Job from git.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

@@ -36,3 +36,11 @@ The desired state of every workload, expressed as kustomize base + overlays.
   Renaming an SA is a two-file change: its manifest here AND `infra/eks.tf`
   in the same PR.
 - Rendered output must pass `policies/` conftest rules before merge.
+- NetworkPolicy `ipBlock` CIDRs (VPC/ALB ingress, RDS egress) carry a
+  `10.0.0.0/8` placeholder in base — overlays or the landing zone resolve
+  them; a wrong-but-explicit CIDR beats a silent allow-all.
+- AnalysisTemplates deploy into `conduit` (namespace-scoped resources must
+  land where the Rollouts that reference them live).
+- Spring env keys (`SPRING_DATASOURCE_*`) are the app-side contract with
+  the synced Secret — verify against the payload image's configuration
+  when apps/ lands (P4 CI smoke tests will prove it end-to-end).

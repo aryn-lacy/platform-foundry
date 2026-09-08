@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: dev-analysis
-  namespace: argocd
+  namespace: conduit
 spec:
   project: platform-foundry
   source:
@@ -11,7 +11,7 @@ spec:
     path: k8s/analysis/overlays/dev
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: conduit
   syncPolicy:
     automated:
       prune: true

@@ -2,8 +2,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base
-patches:
-  - path: spc-env.yaml
-    target:
-      kind: SecretProviderClass
-      name: backend-db
+images:
+  # Placeholder account — the landing zone wiring replaces ACCOUNT_ID.
+  # newTag is rewritten by CI (kustomize edit set image) on every build;
+  # prod must never sync while a v0.0.0-placeholder tag is live.
+  - name: PLACEHOLDER_ECR/backend
+    newName: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/platform-foundry/backend
+    newTag: v0.0.0-placeholder

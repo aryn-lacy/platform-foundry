@@ -45,3 +45,11 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # Database: the identity-tier RDS endpoint (VPC-external to the
+    # cluster) — explicit egress; SG cannot override pod-level deny.
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8 # placeholder — overlay-resolved per LZ
+      ports:
+        - protocol: TCP
+          port: 5432
