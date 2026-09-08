@@ -8,7 +8,6 @@ on:
   pull_request:
     paths:
       - "k8s/*/overlays/prod/**"
-      - ".github/workflows/tag-promotion.yml"
 
 permissions:
   contents: read

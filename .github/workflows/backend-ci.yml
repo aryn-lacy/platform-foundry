@@ -39,7 +39,9 @@ jobs:
           cache: maven
       - name: "Unit tests"
         working-directory: apps/backend
-        run: ./mvnw -B test
+        # Exclude the Spring context-load test (needs live Postgres +
+        # Keycloak); integration covers it with Testcontainers below.
+        run: ./mvnw -B test -Dtest='!RealworldApplicationTests'
 
   integration:
     runs-on: ubuntu-latest
@@ -71,7 +73,7 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
       - name: Trivy (fail on CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: platform-foundry/backend:ci
           exit-code: "1"
