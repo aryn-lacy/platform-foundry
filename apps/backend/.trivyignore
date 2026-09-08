@@ -1,0 +1,7 @@
+# CVEs with no published fix: trivy's DB cites fixed versions (10.1.56+)
+# that do not exist in Maven Central — 10.1.55 is the newest published
+# tomcat-embed artifact. Unfixable until Apache releases; revisit on the
+# next tomcat 10.1.x drop. Gate stays hard-fail for everything else.
+CVE-2026-65182
+CVE-2026-65905
+CVE-2026-68525
