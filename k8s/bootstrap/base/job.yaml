@@ -2,8 +2,12 @@
 # as master using CSI-mounted break-glass secrets and creates the
 # least-privilege service roles with their ALREADY-STAGED passwords.
 # Each instance provisions its own database at creation — no database
-# creation here. Idempotent (IF NOT EXISTS). Secrets arrive as flat files
-# at the mount root, one per jmesPath alias (ASCP behavior).
+# creation here. Idempotent (IF NOT EXISTS).
+#
+# Shell-safety: NO $${VAR} double-dollar syntax anywhere in this file —
+# in YAML block scalars $$ reaches bash literally and expands to the
+# PID. Plain $VAR reads from files are exported once, then passed to
+# psql via -v (server-side substitution).
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -27,40 +31,40 @@ spec:
         - name: psql
           image: postgres:16-alpine
           command: ["/bin/sh", "-c"]
-          # psql -v variables are substituted safely inside the single-
-          # quoted heredoc (:'var' syntax) — no shell interpolation of SQL.
           args:
             - |
               set -eu
+              export PGPASSWORD
+              # --- app tier ---
+              PGPASSWORD=$(cat /mnt/secrets/masterapppassword)
               APP_PASS=$(cat /mnt/secrets/apppassword)
               APP_HOST=$(cat /mnt/secrets/apphost)
-              KC_PASS=$(cat /mnt/secrets/kcpassword)
-              KC_HOST=$(cat /mnt/secrets/kchost)
-              MASTER_APP=$(cat /mnt/secrets/masterapppassword)
-              MASTER_KC=$(cat /mnt/secrets/masterkcpassword)
-
-              psql "host=$${APP_HOST} user=foundry_admin dbname=realworld_app password=$${MASTER_APP} sslmode=require"                 -v appass="$${APP_PASS}" <<'SQL'
-              DO $$
+              psql "host=$APP_HOST user=foundry_admin dbname=realworld_app sslmode=require" \
+                -v appass="$APP_PASS" <<'SQL'
+              DO $do$
               BEGIN
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'realworld_app') THEN
                   CREATE ROLE realworld_app LOGIN PASSWORD :'appass';
                 END IF;
               END
-              $$;
+              $do$;
               GRANT ALL PRIVILEGES ON DATABASE realworld_app TO realworld_app;
               SQL
-
-              psql "host=$${KC_HOST} user=foundry_admin dbname=keycloak password=$${MASTER_KC} sslmode=require"                 -v kcpass="$${KC_PASS}" <<'SQL'
-              DO $$
+              # --- keycloak tier ---
+              PGPASSWORD=$(cat /mnt/secrets/masterkcpassword)
+              KC_PASS=$(cat /mnt/secrets/kcpassword)
+              KC_HOST=$(cat /mnt/secrets/kchost)
+              psql "host=$KC_HOST user=foundry_admin dbname=keycloak sslmode=require" \
+                -v kcpass="$KC_PASS" <<'SQL'
+              DO $do$
               BEGIN
                 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'keycloak') THEN
                   CREATE ROLE keycloak LOGIN PASSWORD :'kcpass';
                 END IF;
               END
-              $$;
+              $do$;
               GRANT ALL PRIVILEGES ON DATABASE keycloak TO keycloak;
               SQL
-
               echo "roles provisioned"
           securityContext:
             allowPrivilegeEscalation: false

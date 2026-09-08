@@ -4,6 +4,10 @@ resources:
   - ../../base
 patches:
   - path: spc-env.yaml
+  - path: profile-patch.yaml
+    target:
+      kind: Deployment
+      name: backend
     target:
       kind: SecretProviderClass
       name: backend-db

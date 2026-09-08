@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: dev-analysis
-  namespace: conduit
+  namespace: argocd # the Application object lives with Argo; its destination is conduit
 spec:
   project: platform-foundry
   source:
@@ -11,7 +11,7 @@ spec:
     path: k8s/analysis/overlays/dev
   destination:
     server: https://kubernetes.default.svc
-    namespace: conduit
+    namespace: conduit # AnalysisTemplates are namespace-scoped: land where the Rollouts live
   syncPolicy:
     automated:
       prune: true

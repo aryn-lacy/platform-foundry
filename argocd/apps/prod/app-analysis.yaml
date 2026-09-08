@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: prod-analysis
-  namespace: conduit
+  namespace: argocd # the Application object lives with Argo; its destination is conduit
 spec:
   project: platform-foundry
   source:
@@ -11,9 +11,10 @@ spec:
     path: k8s/analysis/overlays/prod
   destination:
     server: https://kubernetes.default.svc
-    namespace: conduit
+    namespace: conduit # AnalysisTemplates are namespace-scoped: land where the Rollouts live
   syncPolicy:
-    # prod: no automated sync — the promotion PR merge is the trigger;
-    # sync is approved by a human or the tag-promotion workflow.
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=false
