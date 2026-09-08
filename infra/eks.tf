@@ -25,6 +25,10 @@ module "eks" {
       namespace       = "keycloak"
       service_account = "keycloak"
     }
+    db-bootstrap = {
+      namespace       = "foundry-bootstrap"
+      service_account = "db-bootstrap"
+    }
   }
 }
 

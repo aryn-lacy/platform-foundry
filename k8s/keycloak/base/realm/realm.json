@@ -1,0 +1,21 @@
+{
+  "realm": "conduit",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "realworld-backend",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${REALM_PLACEHOLDER_CLIENT_SECRET}",
+      "redirectUris": [
+        "/*"
+      ],
+      "webOrigins": [
+        "/*"
+      ],
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true
+    }
+  ]
+}

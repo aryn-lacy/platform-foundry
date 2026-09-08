@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+  - secretproviderclass.yaml
+configMapGenerator:
+  - name: keycloak-realm
+    files:
+      - realm/realm.json
+images:
+  - name: keycloak
+    newName: quay.io/keycloak/keycloak
+    newTag: "26.0"

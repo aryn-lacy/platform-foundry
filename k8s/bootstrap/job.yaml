@@ -1,0 +1,87 @@
+# Roles-only bootstrap Job (ADR-008 contract): connects to each RDS tier
+# as master using CSI-mounted break-glass secrets and creates the
+# least-privilege service roles with their ALREADY-STAGED passwords.
+# Each instance provisions its own database at creation — no database
+# creation here. Idempotent (IF NOT EXISTS). Secrets arrive as flat files
+# at the mount root, one per jmesPath alias (ASCP behavior).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-roles
+  namespace: foundry-bootstrap
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: db-bootstrap
+    spec:
+      serviceAccountName: db-bootstrap
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: psql
+          image: postgres:16-alpine
+          command: ["/bin/sh", "-c"]
+          # psql -v variables are substituted safely inside the single-
+          # quoted heredoc (:'var' syntax) — no shell interpolation of SQL.
+          args:
+            - |
+              set -eu
+              APP_PASS=$(cat /mnt/secrets/apppassword)
+              APP_HOST=$(cat /mnt/secrets/apphost)
+              KC_PASS=$(cat /mnt/secrets/kcpassword)
+              KC_HOST=$(cat /mnt/secrets/kchost)
+              MASTER_APP=$(cat /mnt/secrets/masterapppassword)
+              MASTER_KC=$(cat /mnt/secrets/masterkcpassword)
+
+              psql "host=$${APP_HOST} user=foundry_admin dbname=realworld_app password=$${MASTER_APP} sslmode=require"                 -v appass="$${APP_PASS}" <<'SQL'
+              DO $$
+              BEGIN
+                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'realworld_app') THEN
+                  CREATE ROLE realworld_app LOGIN PASSWORD :'appass';
+                END IF;
+              END
+              $$;
+              GRANT ALL PRIVILEGES ON DATABASE realworld_app TO realworld_app;
+              SQL
+
+              psql "host=$${KC_HOST} user=foundry_admin dbname=keycloak password=$${MASTER_KC} sslmode=require"                 -v kcpass="$${KC_PASS}" <<'SQL'
+              DO $$
+              BEGIN
+                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'keycloak') THEN
+                  CREATE ROLE keycloak LOGIN PASSWORD :'kcpass';
+                END IF;
+              END
+              $$;
+              GRANT ALL PRIVILEGES ON DATABASE keycloak TO keycloak;
+              SQL
+
+              echo "roles provisioned"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          volumeMounts:
+            - name: secrets
+              mountPath: /mnt/secrets
+              readOnly: true
+      volumes:
+        - name: secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: db-bootstrap
