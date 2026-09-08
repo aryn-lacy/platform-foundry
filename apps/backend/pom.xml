@@ -19,7 +19,8 @@
 		<!-- Platform addition (not upstream): tomcat override clears the
 		     CRITICAL CVEs trivy gates on (CVE-2025-24813 partial-PUT RCE,
 		     CVE-2026-41293) — fixed in 10.1.55, managed by the Boot parent. -->
-		<tomcat.version>10.1.55</tomcat.version>
+		<tomcat.version>10.1.58</tomcat.version>
+		<spring-security.version>6.3.4</spring-security.version>
 	</properties>
 	<dependencies>
 		<dependency>
