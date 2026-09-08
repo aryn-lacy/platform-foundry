@@ -12,6 +12,11 @@
 #   - Role passwords are SQL-escaped ('' doubling) before interpolating
 #     into 0600 heredoc SQL files; psql consumes them with -f.
 #   - SQL files are removed via an EXIT trap — on success AND failure.
+#
+# Runs as the image's `postgres` user (uid 70 in postgres:16-alpine):
+# the entrypoint override means docker-entrypoint.sh's gosu drop never
+# executes, and the bare image defaults to uid 0 — runAsNonRoot without
+# an explicit runAsUser would leave the pod in CreateContainerConfigError.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -29,6 +34,8 @@ spec:
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true
+        runAsUser: 70 # postgres user in postgres:16-alpine (entrypoint is overridden; no gosu drop)
+        runAsGroup: 70
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -98,7 +105,7 @@ spec:
               mountPath: /tmp
       volumes:
         - name: tmp
-          emptyDir: {} # writable /tmp: busybox ash materializes heredocs here
+          emptyDir: {} # writable /tmp: busybox ash materializes heredocs here (0777 default — any uid)
         - name: secrets
           csi:
             driver: secrets-store.csi.k8s.io
