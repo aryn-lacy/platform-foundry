@@ -147,7 +147,7 @@ resource "aws_db_instance" "this" {
   max_allocated_storage = 200
 
   multi_az                  = true
-  storage_encrypted         = true
+  storage_encrypted         = false # DEMO: deliberate violation for the red-run example
   deletion_protection       = var.deletion_protection
   skip_final_snapshot       = false
   final_snapshot_identifier = "${var.project_name}-${terraform.workspace}-${each.key}-final"
