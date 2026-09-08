@@ -173,3 +173,20 @@ resource "aws_iam_role" "this_controller" {
   assume_role_policy = data.aws_iam_policy_document.pod_identity_trust.json
   tags               = var.common_tags
 }
+
+# Per-workload associations (ADR-002, revised): each mounting workload's
+# service account bound to the shared read-scoped role above. Declarative
+# bindings — the referenced namespace/SA need not exist yet (inert until
+# the first pod using that SA requests a token). The read policy is
+# attached at the root (infra/eks.tf). SecretProviderClasses must set
+# usePodIdentity: "true" for these to be used.
+resource "aws_eks_pod_identity_association" "workload" {
+  for_each = var.workload_associations
+
+  cluster_name    = aws_eks_cluster.this.name
+  namespace       = each.value.namespace
+  service_account = each.value.service_account
+  role_arn        = aws_iam_role.this_controller.arn
+
+  tags = merge(var.common_tags, { Workload = each.key })
+}

@@ -1,3 +1,9 @@
+# Workload associations (ADR-002, revised): the mounting SAs defined by
+# the k8s manifests (k8s/backend, k8s/keycloak) bound to the shared
+# read-scoped role. Declarative bindings — see the workload identity
+# contract in docs/architecture.md: these SAs don't exist until Argo
+# delivers the workloads; renames are a two-file, same-PR change
+# (this map + the k8s manifest).
 module "eks" {
   source = "./modules/eks"
 
@@ -9,6 +15,17 @@ module "eks" {
   endpoint_private_access = var.endpoint_private_access
   allowed_api_cidrs       = var.allowed_api_cidrs
   common_tags             = var.common_tags
+
+  workload_associations = {
+    backend = {
+      namespace       = "conduit"
+      service_account = "backend"
+    }
+    keycloak = {
+      namespace       = "keycloak"
+      service_account = "keycloak"
+    }
+  }
 }
 
 # Attach the secrets CSI read policy to the shared read-scoped role
