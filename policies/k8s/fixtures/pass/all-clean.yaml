@@ -1,0 +1,117 @@
+# PASS fixture: every workload kind clean, every rule silent.
+# Covers BOTH Rollout shapes the estate uses:
+#   - inline-template Rollout (directly labeled)
+#   - workloadRef Rollout (labels resolve from the referenced Deployment)
+# plus a Job — the kinds a Deployment-only rule would miss.
+apiVersion: apps/v1
+kind: Rollout
+metadata:
+  name: good-app
+  namespace: conduit
+spec:
+  template:
+    metadata:
+      labels:
+        app: good-app
+    spec:
+      containers:
+        - name: app
+          image: registry.example.com/good-app@sha256:abcdef0123456789
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: refd-app
+  namespace: conduit
+spec:
+  template:
+    metadata:
+      labels:
+        app: refd-app
+    spec:
+      containers:
+        - name: app
+          image: registry.example.com/refd-app:v2.1.0
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: refd-app
+  namespace: conduit
+spec:
+  workloadRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: refd-app
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: good-job
+  namespace: foundry-bootstrap
+spec:
+  template:
+    metadata:
+      labels:
+        app: good-job
+    spec:
+      containers:
+        - name: worker
+          image: registry.example.com/tool:v1.2.3
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: good-app-default-deny
+  namespace: conduit
+spec:
+  podSelector:
+    matchLabels:
+      app: good-app
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: refd-app-default-deny
+  namespace: conduit
+spec:
+  podSelector:
+    matchLabels:
+      app: refd-app
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - {}
+  egress:
+    - to:
+        - podSelector: {}

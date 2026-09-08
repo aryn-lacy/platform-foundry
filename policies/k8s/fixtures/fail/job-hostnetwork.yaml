@@ -1,0 +1,20 @@
+# FAIL fixture: privileged-only violation on a Job (proves Job-kind coverage)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bad-job
+  namespace: foundry-bootstrap
+spec:
+  template:
+    metadata:
+      labels:
+        app: bad-job
+    spec:
+      hostNetwork: true # no-privileged: hostNetwork branch
+      containers:
+        - name: worker
+          image: registry.example.com/tool:v1.2.3
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi

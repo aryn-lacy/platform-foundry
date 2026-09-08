@@ -1,0 +1,30 @@
+# FAIL fixture: every rule must fire on this bundle
+apiVersion: apps/v1
+kind: Rollout
+metadata:
+  name: bad-app
+  namespace: conduit
+spec:
+  template:
+    metadata:
+      labels:
+        app: bad-app
+    spec:
+      containers:
+        - name: app # resource-limits: no limits
+          image: registry.example.com/bad-app:latest # no-latest: :latest
+          securityContext:
+            privileged: true # no-privileged
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bad-app-egress
+  namespace: conduit
+spec:
+  podSelector:
+    matchLabels:
+      app: bad-app
+  policyTypes: [Egress]
+  egress:
+    - {} # restricted-egress: allow-all rule
