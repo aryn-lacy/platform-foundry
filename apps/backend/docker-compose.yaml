@@ -1,0 +1,69 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - KEYCLOAK_REALM_ADMIN=${KEYCLOAK_REALM_ADMIN}
+      - KEYCLOAK_REALM_ADMIN_PASSWORD=${KEYCLOAK_REALM_ADMIN_PASSWORD}
+      - KEYCLOAK_REALM_CLIENT_ID=${KEYCLOAK_REALM_CLIENT_ID}
+      - KEYCLOAK_REALM_CLIENT_SECRET=${KEYCLOAK_REALM_CLIENT_SECRET}
+      - KEYCLOAK_SERVER_URL=http://keycloak:8080
+      - APP_DB=${APP_DB}
+      - APP_DB_HOSTNAME=appdb
+      - APP_DB_PASSWORD=${APP_DB_PASSWORD}
+      - APP_DB_PORT=${APP_DB_PORT}
+      - APP_DB_USERNAME=${APP_DB_USERNAME}
+      - PORT=${PORT}
+    depends_on:
+      keycloak:
+        condition: service_started
+      appdb:
+        condition: service_healthy
+  appdb:
+    image: "postgres:15"
+    ports:
+      - ${APP_DB_PORT}:${APP_DB_PORT}
+    environment:
+      - POSTGRES_USER=${APP_DB_USERNAME}
+      - POSTGRES_PASSWORD=${APP_DB_PASSWORD}
+      - POSTGRES_DB=${APP_DB}
+    volumes:
+      - ./appdb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  keycloak:
+    image: "quay.io/keycloak/keycloak"
+    command: ["start-dev"]
+    ports:
+      - 8081:8080
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloakdb:5432/postgres
+      # - KC_LOG_LEVEL=DEBUG
+      - KC_DB_USERNAME=postgres
+      - KC_DB_PASSWORD=postgres
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    depends_on:
+      keycloakdb:
+        condition: service_healthy
+  keycloakdb:
+    image: "postgres:15"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - ./keycloakdb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

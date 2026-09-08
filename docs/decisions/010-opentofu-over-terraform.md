@@ -29,7 +29,7 @@ locking).
 
 ## Consequences
 
-- CI (Phase 4) uses the OpenTofu setup action, not hashicorp's.
+- CI uses the OpenTofu setup action (`opentofu/setup-opentofu`), not hashicorp's.
 - The S3-native locking feature is OpenTofu-1.10+; the DynamoDB lock-table
   path remains available if a Terraform runner is ever mandated (documented
   in `infra/bootstrap/README.md`).
