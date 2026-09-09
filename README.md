@@ -54,6 +54,7 @@ make lint-workflows            # actionlint over CI workflows
 ```
 
 # Provision (per landing zone):
+```
 cd infra
 tofu init
 tofu workspace select dev  # or: tofu workspace new dev
