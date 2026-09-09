@@ -55,7 +55,7 @@ flowchart TB
 
     BUILD --> SCAN --> ECR
     SCAN --> SETIMG --> ARGO
-    K6GATE -.->|post-deploy (dev)| CANARY
+    K6GATE -.->|"post-deploy (dev)"| CANARY
     ARGO --> CANARY
     CANARY --> RDSA
     KEYCLOAK --> RDSK
