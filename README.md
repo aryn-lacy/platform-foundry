@@ -11,6 +11,22 @@ The platform is the product. The application it deploys is a placeholder payload
 a RealWorld ("Conduit") full-stack app (Spring Boot API, Keycloak identity, React
 frontend) chosen to exercise every part of the delivery system realistically.
 
+## Justifications of technologies used
+- **ArgoCD** -- Industry standard tooling, I find dev teams have an easier time understanding and using argocd web based ui and pull based application approach for deployment
+- **k6** -- small footprint, made it easy to work with in ci/cd pipeline instead of the heavier lift of the other options
+- **OpenTofu** -- Better open source support for self hosted ci/cd pipelines along with encrypted state. Infra code is agnostic and terraform can be dropped in with no changes.
+- **Checkov** -- Excellent static code analysis tool for working with infra code and includes many many classes of misconfigurations and insecure configurations as failures. Great for ensuring secure terraform code
+- **tfsec/trivy** -- Checks for misconfigurations however we are using this tool for the Rego policies to ensure proper image creation and use in environment. 
+- **Github Actions** -- CI/CD environment, choice of convience. This could easily be implemented in any modern CI system like Gitlab CI or Jenkins Pipelines.
+- **EKS Auto Mode** -- Used to automatically scale the cluster. Reduces amount of time need for ops to work on clusters. Good trade for small shops where ops labor is at a premium. Can easily be swapped for karpenter if need. 
+- **Kustomizer** -- Smaller lift then Helm Charts for adding the services to the eks cluster. Helm would be the choice for a complex setup requiring external packaging. 
+- **Otel Collector** -- Industry standard tool for collecting and emiting otel metrics and logs for systems like Prometheus and the LGTM stack. 
+- **Handspun Terraform Modules** -- Allows for easy reuse and quick updating of the resources when the pattern is called for again. Community modules typically result in churn for ops teams as the modules get updated and break former established use patterns.
+- **Terraform Workspaces** -- Infra code should be the same between environments making workspaces a great and viable way to switch between the different environments. In practice the relatively small footprint of this infra code would still allow for the use of workspaces even if infrastructure is vastly different between dev and prod environments. 
+- **Backend** -- Represented by [marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql](https://github.com/marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql). I believe that this is a good representation of what a production grade backend would look like and matches architechture I have deployed.
+- **Frontend** -- Represented by [yurisldk/realworld-react-fsd](https://github.com/yurisldk/realworld-react-fsd). A well developed and actively kept frontend that maintains the realworld spec. This matches many of the web applications I have deployed. 
+- **Container Promotion** -- Handled via tag promotion and enforced via ci/cd pipeline. A Dev Image with the same tag must exist before a prod image can be promoted. Ensures we know what is getting to prod and that the deployment packages match what we have in dev. 
+
 ## What this repository demonstrates
 
 - **Infrastructure as code** — modular Terraform, pinned providers, one code path
