@@ -3,8 +3,8 @@
 #
 # Diffs a k6 summary-handle.json against a committed baseline:
 #   - FAILS CLOSED: every baseline scenario must be present in the
-#     summary with data (p95 != null, count > 0) — missing metrics are
-#     a failure, never a pass (review round-1 finding 1)
+#     summary with data (p95, error_rate != null; count > 0) — missing
+#     metrics are a failure, never a pass (round-1 finding 1, round-2 minor)
 #   - p95 per scenario: FAIL if current > baseline x tolerance (default 1.15)
 #   - error rate per scenario: FAIL if current > 0.01 absolute
 #   - p99: reported, not gated (noisy at low VU counts; D3)
@@ -30,8 +30,12 @@ for scenario in $(jq -r '.scenarios | keys[]' "$BASELINE"); do
   fi
   p95=$(jq -r --arg s "$scenario" '.scenarios[$s].p95' "$SUMMARY")
   count=$(jq -r --arg s "$scenario" '.scenarios[$s].count // 0' "$SUMMARY")
+  err=$(jq -r --arg s "$scenario" '.scenarios[$s].error_rate' "$SUMMARY")
   if [ "$p95" = "null" ] || [ -z "$p95" ]; then
     echo "FAIL-CLOSED: scenario '$scenario' has no p95 in summary — no data, no verdict" >&2
+    missing=1
+  elif [ "$err" = "null" ] || [ -z "$err" ]; then
+    echo "FAIL-CLOSED: scenario '$scenario' has no error_rate in summary — no data, no verdict" >&2
     missing=1
   elif [ "$count" -le 0 ] 2>/dev/null; then
     echo "FAIL-CLOSED: scenario '$scenario' has count=$count — zero samples cannot clear a gate" >&2

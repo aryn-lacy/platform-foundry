@@ -23,6 +23,10 @@ mkdir -p k6/baselines
 WORKDIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR"' EXIT
 
+# Warm the target first — the baseline must represent steady-state,
+# matching how perf.yml profiles (scripts/warmup-target.sh, shared).
+"$(dirname "$0")/warmup-target.sh" "$BASE_URL" 90
+
 echo "==> running fixed profile against $BASE_URL"
 # v2 default trend stats omit p(99)/count — the baseline needs them
 export K6_SUMMARY_TREND_STATS="avg,p(95),p(99),count"

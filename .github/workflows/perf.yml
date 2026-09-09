@@ -99,6 +99,8 @@ jobs:
             sleep 5
           done
           echo "::error::backend never became ready"; docker logs perf-target | tail -30; exit 1
+      - name: Warm the target (JIT steady-state — matches seeding conditions)
+        run: scripts/warmup-target.sh http://localhost:18080 90
       - name: k6 smoke profile
         run: k6 run k6/smoke.js --quiet
         env:
