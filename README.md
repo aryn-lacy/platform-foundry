@@ -16,7 +16,7 @@ frontend) chosen to exercise every part of the delivery system realistically.
  Industry standard tooling, I find dev teams have an easier time understanding and using argocd web based ui and pull based application approach for deployment
 - **k6** — small footprint, made it easy to work with in ci/cd pipeline instead of the heavier lift of the other options
 - **OpenTofu** — Better open source support for self hosted ci/cd pipeline technologies (OpenTaco/Digger) along with optional encrypted state. This setup uses an encrypted s3 bucket for state protection for terraform compatibility. Infra code is agnostic and terraform can be dropped in with no changes.
-- **Checkov/trivy/tfsec** — Excellent static code analysis tools for working with infra code and includes many many classes of misconfigurations and insecure configurations as failures. Great for ensuring secure terraform code. Also include CVE scanner for image creation. 2 tools cover many different classes of failures and are often run together to cover gaps in either tool.
+- **Checkov/trivy** — Excellent static code analysis tools for working with infra code and includes many many classes of misconfigurations and insecure configurations as failures. Great for ensuring secure terraform code. Also include CVE scanner for image creation. 2 tools cover many different classes of failures and are often run together to cover gaps in either tool.
 - **Conftest/OPA** — Enforces policy as code and ensures images and setup adhere to secure implementation and best practices for this pipeline. In this codebase this enforces granular tags for images, least privilege for 
 - **Github Actions** — CI/CD environment, choice of convenience. This could easily be implemented in any modern CI system like Gitlab CI or Jenkins Pipelines.
 - **EKS Auto Mode** — Used to automatically scale the cluster. Reduces amount of time need for ops to work on clusters. Good trade for small shops where ops labor is at a premium. Can easily be swapped for karpenter if need. 
@@ -39,8 +39,8 @@ frontend) chosen to exercise every part of the delivery system realistically.
   NetworkPolicies)
 - **GitOps & progressive delivery** — app-of-apps, per-environment overlays,
   step-pause canaries with AnalysisTemplate guards, commit-as-deploy-record
-- **Supply chain & policy** — Trivy image scanning, tfsec/Checkov on Terraform,
-  Conftest/OPA on rendered manifests, all pre-merge
+- **Supply chain & policy** — Trivy (image CVEs + Terraform misconfig),
+  Checkov (fail on any finding), Conftest/OPA on rendered manifests, all pre-merge
 - **Performance engineering** — k6 load profiles with thresholds, latency
   baselines versioned in git, regressions fail the build
 

@@ -31,7 +31,7 @@ assumed external dependency ([assumption A3](../assumptions.md)).
 flowchart TB
     subgraph CI["GitHub Actions — no cluster credentials"]
         BUILD["path-filtered CI<br/>lint · unit · integration (Testcontainers)"]
-        SCAN["trivy (fail CRITICAL)<br/>tfsec/checkov (infra)<br/>conftest/OPA (manifests)"]
+        SCAN["trivy (fail CRITICAL)<br/>trivy/checkov (infra)<br/>conftest/OPA (manifests)"]
         SETIMG["kustomize edit set image<br/>+ commit (the deploy record)"]
         K6GATE["k6 perf gate<br/>vs committed baseline"]
     end
