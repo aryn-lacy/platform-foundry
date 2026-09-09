@@ -139,9 +139,10 @@ inert until the first pod using that SA requests a token. Consequences:
   does not silently degrade.
 - Image tags in manifests are `v0.0.0-placeholder` placeholders; CI's
   `kustomize edit set image` loop overwrites them. `latest` is banned
-  (policies/ will enforce).
+  (`policies/k8s/no-latest.rego` enforces).
 
-*(Manifests land with Phase 3; the contract above is fixed.)*
+The workload-identity contract above is fixed; the manifests live in
+`k8s/` (base + overlays) and `argocd/`.
 
 ---
 
@@ -163,7 +164,7 @@ inert until the first pod using that SA requests a token. Consequences:
 ```
 
 CI holds **no cluster credentials** — every deployment is a commit the
-cluster pulls. *(Workflows land with Phase 4; k6 with Phase 5.)*
+cluster pulls. *(k6 lands with Phase 5.)*
 
 ---
 

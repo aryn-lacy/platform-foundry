@@ -48,6 +48,9 @@ what must not.
 git clone https://github.com/aryn-lacy/platform-foundry.git
 cd platform-foundry
 make help                      # every available target
+make policy                    # local policy gate (12 rendered targets)
+make policy-test               # prove the policy rules fire
+make lint-workflows            # actionlint over CI workflows
 ```
 
 # Provision (per landing zone):

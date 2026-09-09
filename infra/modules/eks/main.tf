@@ -1,9 +1,62 @@
 # EKS Auto Mode (ADR-001): AWS operates nodes, load balancer controller,
 # and storage. No managed node groups, no self-installed controllers.
 
-data "aws_partition" "current" {}
+# Dedicated CMK for Kubernetes secrets encryption (tfsec AVD-AWS-0039).
+resource "aws_kms_key" "eks_secrets" {
+  description             = "${var.project_name}-${terraform.workspace} EKS secrets"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  tags                    = var.common_tags
+}
 
+data "aws_partition" "current" {}
+data "aws_caller_identity" "current" {}
+
+# Explicit key policy (checkov CKV2_AWS_64): account-root IAM control.
+resource "aws_kms_key_policy" "eks_secrets" {
+  key_id = aws_kms_key.eks_secrets.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "Enable IAM User Permissions"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+      {
+        # EKS envelope encryption: the CLUSTER ROLE calls KMS directly
+        # (no service principal). Crypto operations carry no
+        # GrantIsForAWSResource context — that condition belongs only on
+        # grant-management statements and AWS docs advise against using
+        # it for CreateCluster; over-scoping it denies everything
+        # (review round-2 C1).
+        Sid       = "AllowEKSClusterRoleCrypto"
+        Effect    = "Allow"
+        Principal = { AWS = aws_iam_role.cluster.arn }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid       = "AllowEKSClusterRoleGrant"
+        Effect    = "Allow"
+        Principal = { AWS = aws_iam_role.cluster.arn }
+        Action    = ["kms:CreateGrant", "kms:RetireGrant"]
+        Resource  = "*"
+      },
+    ]
+  })
+}
 resource "aws_eks_cluster" "this" {
+  # checkov:skip=CKV_AWS_339: 1.36 is the latest available EKS version at authoring time; revisit at next EKS release (tracked)
+
   name     = "${var.project_name}-${terraform.workspace}"
   role_arn = aws_iam_role.cluster.arn
   version  = var.kubernetes_version
@@ -36,6 +89,20 @@ resource "aws_eks_cluster" "this" {
   # Auto Mode requires the cluster security + access entry model.
   access_config {
     authentication_mode = "API"
+  }
+
+  # All five control-plane log types to CloudWatch (checkov CKV_AWS_37);
+  # node/pod logs flow via the CloudWatch Observability add-on instead.
+  enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+
+  # Kubernetes secrets encrypted at rest with a dedicated CMK (tfsec
+  # AVD-AWS-0039). Auto Mode nodes/storage are AWS-operated; secrets
+  # encryption is the cluster-level control that remains ours.
+  encryption_config {
+    resources = ["secrets"]
+    provider {
+      key_arn = aws_kms_key.eks_secrets.arn
+    }
   }
 
   tags = merge(var.common_tags, { Name = "${var.project_name}-${terraform.workspace}" })
