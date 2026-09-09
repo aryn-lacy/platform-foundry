@@ -30,21 +30,10 @@ ramp, never an omission. See the [decision log](decisions/README.md).
 
 ## 2. Context: landing zones
 
-```
-                     AWS ORGANIZATION (assumed)
-  ┌────────────────────────────────────────────────────────────┐
-  │  Transit Gateway hub · centralized egress · SCPs · DNS/IPAM │
-  │                                                              │
-  │  ┌───────────────────────┐      ┌───────────────────────┐   │
-  │  │ DEV LANDING ZONE      │      │ PROD LANDING ZONE     │   │
-  │  │ workload account      │      │ workload account      │   │
-  │  │ workspace: dev        │      │ workspace: prod       │   │
-  │  │                       │      │                       │   │
-  │  │  this stack (1 code   │ ───▶ │  this stack (same     │   │
-  │  │  path + dev tfvars)   │promo│  code + prod tfvars)   │   │
-  │  └───────────────────────┘ PR   └───────────────────────┘   │
-  └────────────────────────────────────────────────────────────┘
-```
+See [Fig. 1 — landing-zone context](diagrams/README.md#fig-1--landing-zone-context)
+(two LZ accounts under one assumed org; promotion as a PR between
+overlays — the PR *is* the audit record).
+
 
 Two landing zones, one stack. `terraform workspace` selects the target;
 the provider assumes a per-account role. Promotion is a pull request that
@@ -87,7 +76,7 @@ hand-rolled modules ([ADR-009](decisions/009-hand-rolled-modules.md)).
 
 Credential flow: `random_password` per instance → RDS password
 (lifecycle-ignored) → materialized exactly once as the break-glass secret
-→ Phase-3 bootstrap Job connects as master and creates the
+→ the roles-only bootstrap Job (k8s/bootstrap) connects as master and creates the
 `realworld_app` / `keycloak` roles with their staged passwords → pods run
 least-privilege → masters return to break-glass duty.
 
@@ -148,20 +137,11 @@ The workload-identity contract above is fixed; the manifests live in
 
 ## 5. The pipeline (GitHub Actions — `.github/`)
 
-```
- push (path-filtered)
-   ├─ lint + unit ──► integration (Testcontainers: api+keycloak+pg)
-   ├─ docker build (layered, 2 images) ──► trivy (fail on critical)
-   ├─ push ECR (immutable tag)
-   ├─ POLICY GATE: tfsec/checkov (infra) + conftest/OPA (manifests)
-   └─ kustomize edit set image ──► commit   ← the deploy record
+See [Fig. 2 — platform architecture](diagrams/README.md#fig-2--platform-architecture)
+for the full flow: CI builds/scans/gates and commits the deploy record;
+the cluster pulls it; the workload rolls out canaried under the
+AnalysisTemplate guard; the k6 gate guards post-deploy (dev).
 
- dev overlay commit ──► Argo CD auto-sync ──► canary 20→50→100
-                                              └─ AnalysisTemplate guard
- promotion PR (dev tag → prod overlay) ──► review+gates ──► prod canary
-
- post-deploy (dev): k6 profile vs committed baseline ──► fail on regression
-```
 
 CI holds **no cluster credentials** — every deployment is a commit the
 cluster pulls.
@@ -211,11 +191,11 @@ Ship it, don't host it ([assumption A3](assumptions.md)):
 ```
 apps/        placeholder payload (path-filtered CI)
 infra/       OpenTofu estate (bootstrap, modules, envs)
-k8s/         manifests Argo delivers (base + overlays)     [P3]
-argocd/      Argo CD's own configuration                   [P3]
-policies/    conftest/OPA rules + fixtures                 [P4]
-k6/          load profiles + versioned baselines           [P5]
-.github/     workflows                                      [P4/P5]
+k8s/         manifests Argo delivers (base + overlays)
+argocd/      Argo CD's own configuration
+policies/    conftest/OPA rules + fixtures
+k6/          load profiles + versioned baselines
+.github/     workflows
 scripts/     helpers (baseline seeding, rendering)
 docs/        this document, assumptions, ADRs, runbooks, diagrams
 ```
@@ -232,5 +212,5 @@ docs/        this document, assumptions, ADRs, runbooks, diagrams
 
 ---
 
-*Diagrams-as-code sources land in `docs/diagrams/` with Phase 6 follow-up;
-the ASCII diagrams above are the normative layout in the interim.*
+Diagram sources (Mermaid, rendered natively by GitHub) live in
+[docs/diagrams/](diagrams/README.md) and are referenced from §2 and §5.
