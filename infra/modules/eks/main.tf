@@ -26,23 +26,30 @@ resource "aws_kms_key_policy" "eks_secrets" {
         Resource  = "*"
       },
       {
-        # EKS uses the CLUSTER ROLE's identity for secrets-envelope
-        # encryption (no service principal) — the role must carry
-        # CreateGrant + crypto on this key or encryption_config fails
-        # (review C1).
-        Sid       = "AllowEKSClusterRoleUse"
+        # EKS envelope encryption: the CLUSTER ROLE calls KMS directly
+        # (no service principal). Crypto operations carry no
+        # GrantIsForAWSResource context — that condition belongs only on
+        # grant-management statements and AWS docs advise against using
+        # it for CreateCluster; over-scoping it denies everything
+        # (review round-2 C1).
+        Sid       = "AllowEKSClusterRoleCrypto"
         Effect    = "Allow"
         Principal = { AWS = aws_iam_role.cluster.arn }
         Action = [
+          "kms:Encrypt",
           "kms:Decrypt",
-          "kms:DescribeKey",
-          "kms:CreateGrant",
+          "kms:ReEncrypt*",
           "kms:GenerateDataKey*",
+          "kms:DescribeKey",
         ]
         Resource = "*"
-        Condition = {
-          Bool = { "kms:GrantIsForAWSResource" = "true" }
-        }
+      },
+      {
+        Sid       = "AllowEKSClusterRoleGrant"
+        Effect    = "Allow"
+        Principal = { AWS = aws_iam_role.cluster.arn }
+        Action    = ["kms:CreateGrant", "kms:RetireGrant"]
+        Resource  = "*"
       },
     ]
   })

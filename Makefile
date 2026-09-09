@@ -31,9 +31,9 @@ CONFTEST_ASSET := $(UNAME_S)_$(if $(filter arm64 aarch64,$(UNAME_M)),arm64,x86_6
 
 .PHONY: tools
 tools: ## Install pinned local tooling (kustomize, conftest, actionlint via eget)
-	$(HOME)/.local/bin/eget kubernetes-sigs/kustomize --to=$(HOME)/.local/bin
-	$(HOME)/.local/bin/eget open-policy-agent/conftest --asset='$(CONFTEST_ASSET)' --to=$(HOME)/.local/bin
-	$(HOME)/.local/bin/eget rhysd/actionlint --to=$(HOME)/.local/bin
+	$(HOME)/.local/bin/eget kubernetes-sigs/kustomize --tag=v5.4.3 --to=$(HOME)/.local/bin
+	$(HOME)/.local/bin/eget open-policy-agent/conftest --tag=v0.69.0 --asset='$(CONFTEST_ASSET)' --to=$(HOME)/.local/bin
+	$(HOME)/.local/bin/eget rhysd/actionlint --tag=v1.7.12 --to=$(HOME)/.local/bin
 
 .PHONY: fmt
 fmt: ## Format opentofu (tofu)

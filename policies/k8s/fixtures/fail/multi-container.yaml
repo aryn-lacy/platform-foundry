@@ -1,0 +1,53 @@
+# FAIL fixture: multi-container workload — proves the rules iterate every
+# container without crashing (round-2 I2: helper-function form aborted
+# conftest with eval_conflict_error on 2+ containers).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-container-app
+  namespace: conduit
+spec:
+  template:
+    metadata:
+      labels:
+        app: multi-container-app
+    spec:
+      containers:
+        - name: app
+          image: registry.example.com/app:v1.0.0
+          resources:
+            limits:
+              cpu: 250m
+              memory: 256Mi
+        - name: sidecar # second container — the crash trigger
+          image: registry.example.com/app:latest # no-latest fires HERE
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+      initContainers:
+        - name: init-a
+          image: registry.example.com/init:v1.0.0
+          resources:
+            limits:
+              cpu: 50m
+              memory: 64Mi
+        - name: init-b # second initContainer
+          image: registry.example.com/init:v2.0.0
+          resources: {} # resource-limits fires HERE (init scope)
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: multi-container-app-default-deny
+  namespace: conduit
+spec:
+  podSelector:
+    matchLabels:
+      app: multi-container-app
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - {}
+  egress:
+    - to:
+        - podSelector: {}

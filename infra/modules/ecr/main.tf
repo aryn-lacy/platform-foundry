@@ -42,16 +42,21 @@ resource "aws_kms_key_policy" "ecr" {
         Resource  = "*"
       },
       {
-        # ECR performs decrypt/generate under the pushing/pulling identity
-        # via its service — without the grant, pushes/pulls on the CMK
-        # repos fail (review C1).
-        Sid       = "AllowECRServiceUse"
+        # ECR + KMS is grant-based: the PUSHING/PULLING identity creates a
+        # grant on the key; ECR then encrypts/decrypts layers under that
+        # grant (review round-2 I1). The service-principal Decrypt form
+        # does not match AWS's documented model.
+        Sid       = "AllowPushPullGrantCreation"
         Effect    = "Allow"
-        Principal = { Service = "ecr.${data.aws_region.current.name}.amazonaws.com" }
+        Principal = { AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root" }
         Action = [
+          "kms:CreateGrant",
+          "kms:RetireGrant",
+          "kms:DescribeKey",
+          "kms:Encrypt",
           "kms:Decrypt",
           "kms:GenerateDataKey*",
-          "kms:DescribeKey",
+          "kms:ReEncrypt*",
         ]
         Resource = "*"
         Condition = {

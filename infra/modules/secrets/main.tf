@@ -29,18 +29,23 @@ resource "aws_kms_key_policy" "secrets" {
         Resource  = "*"
       },
       {
-        # Without this, Secrets Manager cannot decrypt under the caller's
-        # identity (review C1) — every CSI mount fails even with IAM perms.
+        # Secrets Manager decrypts under the CALLER's identity — the AWS
+        # documented key-policy form is Principal AWS:* scoped by
+        # ViaService+CallerAccount (review round-2 M4). Works with the
+        # csi_read IAM Decrypt grant; kept as defense in depth.
         Sid       = "AllowSecretsManagerServiceUse"
         Effect    = "Allow"
-        Principal = { Service = "secretsmanager.${data.aws_region.current.name}.amazonaws.com" }
+        Principal = { AWS = "*" }
         Action = [
           "kms:Decrypt",
           "kms:DescribeKey",
         ]
         Resource = "*"
         Condition = {
-          StringEquals = { "kms:ViaService" = "secretsmanager.${data.aws_region.current.name}.amazonaws.com" }
+          StringEquals = {
+            "kms:ViaService"    = "secretsmanager.${data.aws_region.current.name}.amazonaws.com"
+            "kms:CallerAccount" = data.aws_caller_identity.current.account_id
+          }
         }
       },
     ]

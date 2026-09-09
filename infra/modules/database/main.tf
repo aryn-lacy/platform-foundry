@@ -54,11 +54,11 @@ resource "aws_kms_key_policy" "pi" {
         Resource  = "*"
       },
       {
-        # RDS Performance Insights generates data keys under the caller's
-        # identity — without this grant PI enablement fails (review C1).
+        # RDS Performance Insights: canonical regionless service principal
+        # with region-scoped ViaService (review round-2 M5).
         Sid       = "AllowRDSServiceUse"
         Effect    = "Allow"
-        Principal = { Service = "rds.${data.aws_region.current.name}.amazonaws.com" }
+        Principal = { Service = "rds.amazonaws.com" }
         Action = [
           "kms:Decrypt",
           "kms:GenerateDataKey",

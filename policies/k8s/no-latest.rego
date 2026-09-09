@@ -6,14 +6,15 @@
 # Scope: every container (incl. initContainers) of every workload kind —
 # Deployment, Rollout (Argo Rollouts CRD), and Job. A Deployment-only rule
 # would silently pass the whole backend/frontend fleet, which deploys as
-# Rollouts.
+# Rollouts. Containers are bound inside the deny body (NOT via a helper
+# function — a function producing multiple outputs for one input crashes
+# conftest with eval_conflict_error on any multi-container workload).
 #
 # Tagless heuristic: an image is tagless iff its final path segment lacks
 # BOTH a digest marker (@sha256:) and a ':' after any registry host.
 # Registry hosts with ports (registry:5000/app) are handled by only
 # treating ':' as a tag separator when it appears in the last path
-# segment. AnalysisTemplates and other non-workload kinds are exempt —
-# they reference images indirectly via workloads.
+# segment.
 package main
 
 import rego.v1
@@ -26,10 +27,21 @@ docs := [d.contents | some d in input]
 deny contains msg if {
 	some doc in docs
 	workload_kinds[doc.kind]
-	container := pick_container(doc)
+	some container in doc.spec.template.spec.containers
 	bad_image(container.image)
 	msg := sprintf(
 		"%s %s/%s: container %q uses a mutable image reference (%s) — pin a digest or versioned tag",
+		[doc.kind, object.get(doc.metadata, "namespace", "default"), doc.metadata.name, container.name, container.image],
+	)
+}
+
+deny contains msg if {
+	some doc in docs
+	workload_kinds[doc.kind]
+	some container in object.get(doc.spec.template.spec, "initContainers", [])
+	bad_image(container.image)
+	msg := sprintf(
+		"%s %s/%s: init container %q uses a mutable image reference (%s) — pin a digest or versioned tag",
 		[doc.kind, object.get(doc.metadata, "namespace", "default"), doc.metadata.name, container.name, container.image],
 	)
 }
@@ -42,12 +54,4 @@ bad_image(image) if {
 	not contains(image, "@")
 	last := array.reverse(split(image, "/"))[0]
 	not contains(last, ":")
-}
-
-pick_container(doc) := c if {
-	some c in doc.spec.template.spec.containers
-}
-
-pick_container(doc) := c if {
-	some c in object.get(doc.spec.template.spec, "initContainers", [])
 }
