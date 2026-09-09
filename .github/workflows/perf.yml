@@ -1,0 +1,109 @@
+# Perf gate (issue #5, ADR-005): k6 profile vs committed baseline.
+#
+# Post-deploy semantics approximated as post-merge/post-PR against a
+# locally-booted backend (D1): no live dev endpoint exists in this
+# estate (no Ingress/DNS — ALB endpoint documented out-of-band), so CI
+# profiles the same image the deploy pipeline would ship. The GATE
+# (fixed profile -> summary -> tolerance diff vs baseline -> red on
+# regression) is identical either way; only the target differs.
+# Zero cloud credentials.
+name: perf
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/**"
+      - "k6/**"
+      - "scripts/**"
+      - ".github/workflows/perf.yml"
+  pull_request:
+    paths:
+      - "apps/backend/**"
+      - "k6/**"
+      - "scripts/**"
+      - ".github/workflows/perf.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Prove the gate can go RED before proving this run is green —
+      #    same fixture discipline as the Rego policy pack.
+      - name: Install k6
+        run: |
+          curl -sSL https://github.com/grafana/k6/releases/download/v2.2.0/k6-v2.2.0-linux-amd64.tar.gz \
+            | tar -xz -C /usr/local/bin --strip-components=1 k6-v2.2.0-linux-amd64/k6
+          k6 version
+      - name: "DoD: synthetic +15% regression fixture must FAIL the gate"
+        run: |
+          if scripts/check-regression.sh k6/tests/regression-fixture.json k6/baselines/dev.json; then
+            echo "::error::Regression fixture (+15% p95 / 2% errors) passed the gate — the gate is broken"
+            exit 1
+          fi
+          echo "fixture correctly rejected"
+
+      # 2. Boot the REAL dependency stack and profile it (D1): the app
+      #    is Keycloak-native — it will not serve without its identity
+      #    tier and database, same as production.
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/backend
+          push: false
+          load: true
+          tags: platform-foundry/backend:perf
+          cache-from: type=gha,scope=backend
+      - name: Run stack (postgres + keycloak + backend) + wait for readiness
+        run: |
+          set -eux
+          docker network create perf
+          docker run -d --name perf-pg --network perf \
+            -e POSTGRES_DB=realworld -e POSTGRES_USER=realworld -e POSTGRES_PASSWORD=realworld \
+            postgres:16-alpine
+          docker run -d --name perf-kc --network perf -p 18081:8080 \
+            -e KEYCLOAK_ADMIN=realworld_admin -e KEYCLOAK_ADMIN_PASSWORD=realworld_admin \
+            -v "$PWD/apps/backend/src/test/resources/realworld-realm.json:/opt/keycloak/data/import/realworld-realm.json:ro" \
+            quay.io/keycloak/keycloak:26.0 start-dev --http-enabled=true --hostname-strict=false --import-realm
+          for i in $(seq 1 40); do
+            code=$(curl -sm 5 -o /dev/null -w '%{http_code}' http://localhost:18081/realms/realworld || true)
+            [ "$code" = "200" ] && break
+            sleep 5
+          done
+          [ "$code" = "200" ] || { echo "::error::keycloak never became ready"; docker logs perf-kc | tail -30; exit 1; }
+          docker run -d --name perf-target --network perf -p 18080:8080 \
+            -e PORT=8080 -e KEYCLOAK_REALM=realworld \
+            -e KEYCLOAK_REALM_ADMIN=realworld_admin -e KEYCLOAK_REALM_ADMIN_PASSWORD=realworld_admin \
+            -e KEYCLOAK_REALM_CLIENT_ID=realworld-backend -e KEYCLOAK_REALM_CLIENT_SECRET=test-client-secret \
+            -e KEYCLOAK_SERVER_URL=http://perf-kc:8080 \
+            -e APP_DB=realworld -e APP_DB_HOSTNAME=perf-pg -e APP_DB_PORT=5432 \
+            -e APP_DB_USERNAME=realworld -e APP_DB_PASSWORD=realworld \
+            platform-foundry/backend:perf
+          for i in $(seq 1 40); do
+            code=$(curl -sm 5 -o /dev/null -w '%{http_code}' http://localhost:18080/tags || true)
+            [ "$code" = "200" ] && { echo "target up after $((i*5))s"; exit 0; }
+            sleep 5
+          done
+          echo "::error::backend never became ready"; docker logs perf-target | tail -30; exit 1
+      - name: k6 smoke profile
+        run: k6 run k6/smoke.js --quiet
+        env:
+          BASE_URL: http://localhost:18080
+          K6_SUMMARY_TREND_STATS: "avg,p(95),p(99),count"
+      - name: Regression gate vs committed baseline
+        run: scripts/check-regression.sh summary-handle.json k6/baselines/dev.json
+
+      - name: Teardown
+        if: always()
+        run: docker rm -f perf-target perf-kc perf-pg || true; docker network rm perf || true

@@ -164,7 +164,7 @@ The workload-identity contract above is fixed; the manifests live in
 ```
 
 CI holds **no cluster credentials** — every deployment is a commit the
-cluster pulls. *(k6 lands with Phase 5.)*
+cluster pulls.
 
 ---
 

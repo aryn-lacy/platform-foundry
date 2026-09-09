@@ -30,10 +30,11 @@ UNAME_M := $(shell uname -m)
 CONFTEST_ASSET := $(UNAME_S)_$(if $(filter arm64 aarch64,$(UNAME_M)),arm64,x86_64).tar.gz
 
 .PHONY: tools
-tools: ## Install pinned local tooling (kustomize, conftest, actionlint via eget)
+tools: ## Install pinned local tooling (kustomize, conftest, actionlint, k6 via eget)
 	$(HOME)/.local/bin/eget kubernetes-sigs/kustomize --tag=v5.4.3 --to=$(HOME)/.local/bin
 	$(HOME)/.local/bin/eget open-policy-agent/conftest --tag=v0.69.0 --asset='$(CONFTEST_ASSET)' --to=$(HOME)/.local/bin
 	$(HOME)/.local/bin/eget rhysd/actionlint --tag=v1.7.12 --to=$(HOME)/.local/bin
+	$(HOME)/.local/bin/eget grafana/k6 --tag=v2.2.0 --to=$(HOME)/.local/bin
 
 .PHONY: fmt
 fmt: ## Format opentofu (tofu)
@@ -80,8 +81,17 @@ policy-test: ## Prove each policy rule fires: fail-fixtures FAIL, pass-fixtures 
 	done; \
 	echo "all fixtures prove their rules"
 
+.PHONY: perf-test
+perf-test: ## Prove the perf gate can go red: +15% fixture must FAIL (needs k6/baselines/dev.json)
+	@set -eu; \
+	if scripts/check-regression.sh k6/tests/regression-fixture.json k6/baselines/dev.json >/dev/null 2>&1; then \
+		echo "RULE GAP: regression fixture passed the perf gate — gate is broken"; exit 1; \
+	else \
+		echo "  fires: k6/tests/regression-fixture.json correctly rejected"; \
+	fi
+
 .PHONY: test
-test: policy policy-test lint-workflows ## Full local gate (policy + rule fixtures + workflow lint)
+test: policy policy-test lint-workflows perf-test ## Full local gate (policy + rule fixtures + workflow lint + perf fixture)
 
 .PHONY: lint-workflows
 lint-workflows: ## Lint github actions workflows (actionlint)
