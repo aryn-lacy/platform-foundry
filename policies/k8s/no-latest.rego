@@ -1,16 +1,19 @@
-# Policy: no :latest image tags (issue #4)
-# Immutable digests or versioned tags only — a :latest tag makes rollouts
-# non-reproducible and rollbacks impossible.
+# Policy: no :latest image tags, no tagless images (issue #4)
+# Immutable digests or versioned tags only — :latest makes rollouts
+# non-reproducible and rollbacks impossible; a tagless image (e.g.
+# "nginx") resolves to :latest implicitly.
 #
 # Scope: every container (incl. initContainers) of every workload kind —
 # Deployment, Rollout (Argo Rollouts CRD), and Job. A Deployment-only rule
 # would silently pass the whole backend/frontend fleet, which deploys as
 # Rollouts.
 #
-# Interpretation note: tagless images (e.g. "nginx") are ALSO mutable in
-# spirit, but distinguishing a tagless image from a registry host with a
-# port (registry:5000/app) requires fragile parsing; this rule enforces
-# the explicit :latest case, which is what the issue text names.
+# Tagless heuristic: an image is tagless iff its final path segment lacks
+# BOTH a digest marker (@sha256:) and a ':' after any registry host.
+# Registry hosts with ports (registry:5000/app) are handled by only
+# treating ':' as a tag separator when it appears in the last path
+# segment. AnalysisTemplates and other non-workload kinds are exempt —
+# they reference images indirectly via workloads.
 package main
 
 import rego.v1
@@ -24,11 +27,21 @@ deny contains msg if {
 	some doc in docs
 	workload_kinds[doc.kind]
 	container := pick_container(doc)
-	endswith(lower(container.image), ":latest")
+	bad_image(container.image)
 	msg := sprintf(
-		"%s %s/%s: container %q uses :latest tag (%s) — pin an immutable digest or versioned tag",
+		"%s %s/%s: container %q uses a mutable image reference (%s) — pin a digest or versioned tag",
 		[doc.kind, object.get(doc.metadata, "namespace", "default"), doc.metadata.name, container.name, container.image],
 	)
+}
+
+# explicit :latest
+bad_image(image) if endswith(lower(image), ":latest")
+
+# tagless and digestless: last path segment contains no ':' or '@'
+bad_image(image) if {
+	not contains(image, "@")
+	last := array.reverse(split(image, "/"))[0]
+	not contains(last, ":")
 }
 
 pick_container(doc) := c if {

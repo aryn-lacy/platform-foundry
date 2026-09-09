@@ -53,9 +53,27 @@ resource "aws_kms_key_policy" "pi" {
         Action    = "kms:*"
         Resource  = "*"
       },
+      {
+        # RDS Performance Insights generates data keys under the caller's
+        # identity — without this grant PI enablement fails (review C1).
+        Sid       = "AllowRDSServiceUse"
+        Effect    = "Allow"
+        Principal = { Service = "rds.${data.aws_region.current.name}.amazonaws.com" }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "kms:ViaService" = "rds.${data.aws_region.current.name}.amazonaws.com" }
+        }
+      },
     ]
   })
 }
+
+data "aws_region" "current" {}
 
 resource "aws_kms_key" "pi" {
   for_each = local.instances

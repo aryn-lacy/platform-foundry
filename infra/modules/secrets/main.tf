@@ -28,9 +28,26 @@ resource "aws_kms_key_policy" "secrets" {
         Action    = "kms:*"
         Resource  = "*"
       },
+      {
+        # Without this, Secrets Manager cannot decrypt under the caller's
+        # identity (review C1) — every CSI mount fails even with IAM perms.
+        Sid       = "AllowSecretsManagerServiceUse"
+        Effect    = "Allow"
+        Principal = { Service = "secretsmanager.${data.aws_region.current.name}.amazonaws.com" }
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "kms:ViaService" = "secretsmanager.${data.aws_region.current.name}.amazonaws.com" }
+        }
+      },
     ]
   })
 }
+
+data "aws_region" "current" {}
 
 data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
@@ -171,6 +188,11 @@ data "aws_iam_policy_document" "csi_read" {
     actions = [
       "secretsmanager:GetSecretValue",
       "secretsmanager:DescribeSecret",
+      # Secrets Manager performs the KMS Decrypt under the MOUNTING role's
+      # identity (invokedBy: secretsmanager) — CMK-encrypted secrets need
+      # this or every mount fails (review C1).
+      "kms:Decrypt",
+      "kms:DescribeKey",
     ]
     resources = [
       aws_secretsmanager_secret.app_db.arn,
@@ -179,6 +201,7 @@ data "aws_iam_policy_document" "csi_read" {
       aws_secretsmanager_secret.keycloak_client.arn,
       aws_secretsmanager_secret.db_master["app"].arn,
       aws_secretsmanager_secret.db_master["keycloak"].arn,
+      aws_kms_key.secrets.arn,
     ]
   }
 }

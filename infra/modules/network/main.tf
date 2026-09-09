@@ -58,9 +58,27 @@ resource "aws_kms_key_policy" "network" {
         Action    = "kms:*"
         Resource  = "*"
       },
+      {
+        # CloudWatch Logs must be able to use the key for the encrypted
+        # flow-log group — without this, delivery fails (review C1).
+        Sid       = "AllowLogsServiceUse"
+        Effect    = "Allow"
+        Principal = { Service = "logs.${data.aws_region.current.name}.amazonaws.com" }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "kms:ViaService" = "logs.${data.aws_region.current.name}.amazonaws.com" }
+        }
+      },
     ]
   })
 }
+
+data "aws_region" "current" {}
 
 # VPC flow logs to CloudWatch (checkov CKV2_AWS_11): historical network
 # telemetry for the bottleneck-debugging requirement. 365d retention

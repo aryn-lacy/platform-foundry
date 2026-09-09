@@ -25,9 +25,14 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+CONFTEST_ASSET := $(UNAME_S)_$(if $(filter arm64 aarch64,$(UNAME_M)),arm64,x86_64).tar.gz
+
 .PHONY: tools
-tools: ## Install pinned local tooling (conftest, actionlint via eget)
-	$(HOME)/.local/bin/eget open-policy-agent/conftest --asset='Linux_arm64.tar.gz' --to=$(HOME)/.local/bin
+tools: ## Install pinned local tooling (kustomize, conftest, actionlint via eget)
+	$(HOME)/.local/bin/eget kubernetes-sigs/kustomize --to=$(HOME)/.local/bin
+	$(HOME)/.local/bin/eget open-policy-agent/conftest --asset='$(CONFTEST_ASSET)' --to=$(HOME)/.local/bin
 	$(HOME)/.local/bin/eget rhysd/actionlint --to=$(HOME)/.local/bin
 
 .PHONY: fmt

@@ -41,9 +41,28 @@ resource "aws_kms_key_policy" "ecr" {
         Action    = "kms:*"
         Resource  = "*"
       },
+      {
+        # ECR performs decrypt/generate under the pushing/pulling identity
+        # via its service — without the grant, pushes/pulls on the CMK
+        # repos fail (review C1).
+        Sid       = "AllowECRServiceUse"
+        Effect    = "Allow"
+        Principal = { Service = "ecr.${data.aws_region.current.name}.amazonaws.com" }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "kms:ViaService" = "ecr.${data.aws_region.current.name}.amazonaws.com" }
+        }
+      },
     ]
   })
 }
+
+data "aws_region" "current" {}
 
 data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
