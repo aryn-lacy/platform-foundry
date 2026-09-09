@@ -1,0 +1,20 @@
+{
+  "_comment": "Synthetic DoD fixture (issue #5): p95 inflated +20% over baseline (beyond the 1.15x gate limit) and error_rate pinned at 2% (2x the 1% absolute ceiling). scripts/check-regression.sh must FAIL against k6/baselines/dev.json. If the baseline is regenerated, regenerate this fixture with the same transform.",
+  "fixture_rule": "p95 = baseline_p95 * 1.20, p99 = baseline_p99 * 1.20, error_rate = 0.02",
+  "scenarios": {
+    "articles": {
+      "p95": 9.928559,
+      "p99": 21.943132,
+      "avg": 3.3359963296618425,
+      "error_rate": 0.02,
+      "count": 111217
+    },
+    "tags": {
+      "p95": 10.483556,
+      "p99": 22.555589,
+      "avg": 3.4530168335431317,
+      "error_rate": 0.02,
+      "count": 54819
+    }
+  }
+}

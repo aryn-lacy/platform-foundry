@@ -1,14 +1,27 @@
-# scripts/ — helper contracts
+# scripts/ — helpers
 
-Small, documented, idempotent utilities. Everything here is safe to run twice.
+## seed-baseline.sh
 
-**Planned** (land with their phases)
+`(Re)generates the committed k6 perf baseline deliberately:`
 
-- `seed-baseline.sh` — regenerate a k6 latency baseline deliberately (P5)
-- `render-manifests.sh` — render overlays for local inspection (P3)
-- `eks-creds.sh` — assume the landing-zone role and write kubeconfig (P2)
+```bash
+scripts/seed-baseline.sh <env> <base-url> [commit]
+```
 
-**Contract**
+Runs the fixed profile (`k6/smoke.js`) against the target, extracts
+per-scenario p95/p99/error-rate, and writes `k6/baselines/<env>.json`
+with seeding metadata (date, target, k6 version, commit). The baseline
+is committed — regeneration is a PR-reviewed act.
 
-- No secrets printed or persisted. Credentials live in env vars with the shortest viable lifetime.
-- Every script supports `--dry-run` if it mutates anything.
+## check-regression.sh
+
+`The perf gate's judgment:`
+
+```bash
+scripts/check-regression.sh <summary-handle.json> <baseline.json> [tolerance]
+```
+
+- p95 per scenario: **FAIL** if current > baseline × tolerance (default 1.15)
+- error rate per scenario: **FAIL** if > 1% absolute
+- p99: report-only
+- Breach exits 1 naming the metric; prints a comparison table
