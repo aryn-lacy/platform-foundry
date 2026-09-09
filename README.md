@@ -11,21 +11,24 @@ The platform is the product. The application it deploys is a placeholder payload
 a RealWorld ("Conduit") full-stack app (Spring Boot API, Keycloak identity, React
 frontend) chosen to exercise every part of the delivery system realistically.
 
-## Justifications of technologies used
-- **ArgoCD** -- Industry standard tooling, I find dev teams have an easier time understanding and using argocd web based ui and pull based application approach for deployment
-- **k6** -- small footprint, made it easy to work with in ci/cd pipeline instead of the heavier lift of the other options
-- **OpenTofu** -- Better open source support for self hosted ci/cd pipelines along with encrypted state. Infra code is agnostic and terraform can be dropped in with no changes.
-- **Checkov** -- Excellent static code analysis tool for working with infra code and includes many many classes of misconfigurations and insecure configurations as failures. Great for ensuring secure terraform code
-- **tfsec/trivy** -- Checks for misconfigurations however we are using this tool for the Rego policies to ensure proper image creation and use in environment. 
-- **Github Actions** -- CI/CD environment, choice of convience. This could easily be implemented in any modern CI system like Gitlab CI or Jenkins Pipelines.
-- **EKS Auto Mode** -- Used to automatically scale the cluster. Reduces amount of time need for ops to work on clusters. Good trade for small shops where ops labor is at a premium. Can easily be swapped for karpenter if need. 
-- **Kustomizer** -- Smaller lift then Helm Charts for adding the services to the eks cluster. Helm would be the choice for a complex setup requiring external packaging. 
-- **Otel Collector** -- Industry standard tool for collecting and emiting otel metrics and logs for systems like Prometheus and the LGTM stack. 
-- **Handspun Terraform Modules** -- Allows for easy reuse and quick updating of the resources when the pattern is called for again. Community modules typically result in churn for ops teams as the modules get updated and break former established use patterns.
-- **Terraform Workspaces** -- Infra code should be the same between environments making workspaces a great and viable way to switch between the different environments. In practice the relatively small footprint of this infra code would still allow for the use of workspaces even if infrastructure is vastly different between dev and prod environments. 
-- **Backend** -- Represented by [marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql](https://github.com/marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql). I believe that this is a good representation of what a production grade backend would look like and matches architechture I have deployed.
-- **Frontend** -- Represented by [yurisldk/realworld-react-fsd](https://github.com/yurisldk/realworld-react-fsd). A well developed and actively kept frontend that maintains the realworld spec. This matches many of the web applications I have deployed. 
-- **Container Promotion** -- Handled via tag promotion and enforced via ci/cd pipeline. A Dev Image with the same tag must exist before a prod image can be promoted. Ensures we know what is getting to prod and that the deployment packages match what we have in dev. 
+## Justifications for technologies used
+- **Argo CD** - [`docs/runbooks/`](docs/runbooks/) — restore, rollback
+ Industry standard tooling, I find dev teams have an easier time understanding and using argocd web based ui and pull based application approach for deployment
+- **k6** — small footprint, made it easy to work with in ci/cd pipeline instead of the heavier lift of the other options
+- **OpenTofu** — Better open source support for self hosted ci/cd pipeline technologies (OpenTaco/Digger) along with optional encrypted state. This setup uses an encrypted s3 bucket for state protection for terraform compatibility. Infra code is agnostic and terraform can be dropped in with no changes.
+- **Checkov/trivy/tfsec** — Excellent static code analysis tools for working with infra code and includes many many classes of misconfigurations and insecure configurations as failures. Great for ensuring secure terraform code. Also include CVE scanner for image creation. 2 tools cover many different classes of failures and are often run together to cover gaps in either tool.
+- **Conftest/OPA** — Enforces policy as code and ensures images and setup adhere to secure implementation and best practices for this pipeline. In this codebase this enforces granular tags for images, least privilege for 
+- **Github Actions** — CI/CD environment, choice of convenience. This could easily be implemented in any modern CI system like Gitlab CI or Jenkins Pipelines.
+- **EKS Auto Mode** — Used to automatically scale the cluster. Reduces amount of time need for ops to work on clusters. Good trade for small shops where ops labor is at a premium. Can easily be swapped for karpenter if need. 
+- **Kustomize** — Smaller lift then Helm Charts for adding the services to the eks cluster. Helm would be the choice for a complex setup requiring external packaging. 
+- **Otel Collector** — Industry standard tool for collecting and emitting otel metrics and logs for systems like Prometheus and the LGTM stack. 
+- **Handspun Terraform Modules** — Allows for easy reuse and quick updating of the resources when the pattern is called for again. Community modules typically result in churn for ops teams as the modules get updated and break former established use patterns.
+- **Terraform workspaces** — Infra code should be the same between environments making workspaces a great and viable way to switch between the different environments. In practice the relatively small footprint of this infra code would still allow for the use of workspaces even if infrastructure is vastly different between dev and prod environments. 
+- **Backend** — Represented by [marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql](https://github.com/marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql). I believe that this is a good representation of what a production grade backend would look like and matches architechture I have deployed.
+- **Frontend** — Represented by [yurisldk/realworld-react-fsd](https://github.com/yurisldk/realworld-react-fsd). A well developed and actively kept frontend that maintains the realworld spec. This matches many of the web applications I have deployed. 
+- **Container Promotion** — Handled via tag promotion and enforced via ci/cd pipeline. A Dev Image with the same tag must exist before a prod image can be promoted. Ensures we know what is getting to prod and that the deployment packages match what we have in dev. 
+- **Separate Databases** — Instead of handing the entire backend and keyclock database in the same physical database, I chose to separate these data stores to better reflect the reality of running similar applications. Typically speaking for security and safety it is better to run individual databases on individual RDS instances unless many databases are needed for a single application.
+- **Canary Rollout** — Used Argo CD Canary Rollouts in production to ensure a smooth deployment where regression issues are caught early.
 
 ## What this repository demonstrates
 
