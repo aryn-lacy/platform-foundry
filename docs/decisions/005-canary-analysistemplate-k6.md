@@ -18,7 +18,7 @@ Both, each honest about what it needs:
   *before* rollout. Depends on nothing but the endpoint.
 - **AnalysisTemplate** — declared in-cluster guard during rollout (P3):
   canary steps gated on error-rate/p95 queries against the **assumed**
-  platform Prometheus (A3). The manifest is a deliverable of Phase 3;
+  platform Prometheus (A3). The manifest ships with the workloads (k8s/analysis/);
   dependency documented, not hidden.
 
 ## Consequences

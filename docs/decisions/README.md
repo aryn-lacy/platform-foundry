@@ -20,7 +20,7 @@ All eleven decisions are reflected in code where they live:
 001/002 in `modules/eks` (Auto Mode config; Pod Identity role +
 association), 003 in the root + `envs/`, 004 in the TLS posture (ACM at
 the edge — the ALB itself is provisioned by Auto Mode's AWS-operated
-controller; the listener lands with the P3 ingress manifests), 005 in
+controller), 005 in
 `k8s/analysis/` (P3) + `k6/` (P5), 006 in the NetworkPolicy posture
 (P3), 008 in `modules/database`, 009 in `infra/modules/README.md`, 010 in
 `infra/versions.tf` + the Makefile, 011 in `k6/` + `scripts/` +
