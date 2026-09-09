@@ -24,4 +24,7 @@ controller; the listener lands with the P3 ingress manifests), 005 in
 `k8s/analysis/` (P3) + `k6/` (P5), 006 in the NetworkPolicy posture
 (P3), 008 in `modules/database`, 009 in `infra/modules/README.md`, 010 in
 `infra/versions.tf` + the Makefile, 011 in `k6/` + `scripts/` +
-`.github/workflows/perf.yml`.
+`.github/workflows/perf.yml`. (004's edge is ACM-by-ALB as provisioned;
+the repository ships no ingress manifests — the workload's listener is
+an exercise left to the deployer, consistent with the no-cloud-spend
+posture.)
