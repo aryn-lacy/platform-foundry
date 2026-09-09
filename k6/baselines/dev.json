@@ -6,7 +6,8 @@
     "seeded_at": "2026-09-09T02:11:57Z",
     "k6_version": "v2.2.0",
     "tolerance_p95": 1.15,
-    "note": "p95 gated at baseline x1.15 (D3); error rate gated at 1% absolute; p99 report-only"
+    "note": "p95 gated at baseline x1.15 (D3); error rate gated at 1% absolute; p99 report-only. ARCH NOTE: cross-arch comparisons (arm64-seeded baseline vs amd64 CI) accepted \u2014 1.15x tolerance absorbed the observed delta (+3.0%/+1.9%); re-seed on the comparison arch if margins approach the limit",
+    "arch": "aarch64"
   },
   "scenarios": {
     "articles": {

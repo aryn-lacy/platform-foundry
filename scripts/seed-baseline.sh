@@ -26,7 +26,7 @@ trap 'rm -rf "$WORKDIR"' EXIT
 echo "==> running fixed profile against $BASE_URL"
 # v2 default trend stats omit p(99)/count — the baseline needs them
 export K6_SUMMARY_TREND_STATS="avg,p(95),p(99),count"
-BASE_URL="$BASE_URL" "$K6" run k6/smoke.js --summary-export "$WORKDIR/raw.json" || { echo "k6 run failed" >&2; exit 1; }
+BASE_URL="$BASE_URL" "$K6" run k6/smoke.js || { echo "k6 run failed" >&2; exit 1; }
 
 # k6 --summary-export writes the raw summary; handleSummary writes our
 # shaped one next to the cwd. Prefer the shaped one when present.
@@ -36,8 +36,9 @@ SUMMARY="summary-handle.json"
 jq --arg env "$ENV_NAME" --arg url "$BASE_URL" --arg commit "$COMMIT" \
   --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --arg k6ver "$("$K6" version | awk '{print $2}')" \
-  '{meta: {env: $env, target: $url, commit: $commit, seeded_at: $date, k6_version: $k6ver,
-           tolerance_p95: 1.15, note: "p95 gated at baseline x1.15 (D3); error rate gated at 1% absolute; p99 report-only"},
+  --arg arch "$(uname -m)" \
+  '{meta: {env: $env, target: $url, commit: $commit, seeded_at: $date, k6_version: $k6ver, arch: $arch,
+           tolerance_p95: 1.15, note: "p95 gated at baseline x1.15 (D3); error rate gated at 1% absolute; p99 report-only. ARCH NOTE: cross-arch comparisons (e.g. arm64-seeded baseline vs amd64 CI) are accepted ONLY because the 1.15x tolerance absorbs the observed arch delta (+3.0%/+1.9%); re-seed on the comparison arch if margins ever approach the limit"},
     scenarios: .scenarios}' \
   "$SUMMARY" > "$OUT"
 

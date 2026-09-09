@@ -30,4 +30,3 @@ vendor/
 npm-debug.log*
 .yarn/
 summary-handle.json
-.hermes/

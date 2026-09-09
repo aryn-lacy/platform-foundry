@@ -2,6 +2,9 @@
 # check-regression.sh — the perf gate's judgment (issue #5).
 #
 # Diffs a k6 summary-handle.json against a committed baseline:
+#   - FAILS CLOSED: every baseline scenario must be present in the
+#     summary with data (p95 != null, count > 0) — missing metrics are
+#     a failure, never a pass (review round-1 finding 1)
 #   - p95 per scenario: FAIL if current > baseline x tolerance (default 1.15)
 #   - error rate per scenario: FAIL if current > 0.01 absolute
 #   - p99: reported, not gated (noisy at low VU counts; D3)
@@ -17,8 +20,28 @@ TOLERANCE="${3:-1.15}"
 [ -f "$SUMMARY" ] || { echo "summary not found: $SUMMARY" >&2; exit 2; }
 [ -f "$BASELINE" ] || { echo "baseline not found: $BASELINE" >&2; exit 2; }
 
+# --- Fail closed: presence + data checks BEFORE any comparison ---
+missing=0
+for scenario in $(jq -r '.scenarios | keys[]' "$BASELINE"); do
+  if ! jq -e --arg s "$scenario" '.scenarios[$s]' "$SUMMARY" >/dev/null; then
+    echo "FAIL-CLOSED: scenario '$scenario' missing from summary — refusing to judge incomplete data" >&2
+    missing=1
+    continue
+  fi
+  p95=$(jq -r --arg s "$scenario" '.scenarios[$s].p95' "$SUMMARY")
+  count=$(jq -r --arg s "$scenario" '.scenarios[$s].count // 0' "$SUMMARY")
+  if [ "$p95" = "null" ] || [ -z "$p95" ]; then
+    echo "FAIL-CLOSED: scenario '$scenario' has no p95 in summary — no data, no verdict" >&2
+    missing=1
+  elif [ "$count" -le 0 ] 2>/dev/null; then
+    echo "FAIL-CLOSED: scenario '$scenario' has count=$count — zero samples cannot clear a gate" >&2
+    missing=1
+  fi
+done
+[ "$missing" -eq 0 ] || { echo "PERF GATE: incomplete summary (see above) — failing closed" >&2; exit 1; }
+
 fail=0
-printf '%-10s %10s %14s %14s %8s %10s %8s\n' \
+printf '%-10s %10s %10s %10s %10s %8s %10s\n' \
   scenario metric baseline limit current verdict margin
 
 for scenario in $(jq -r '.scenarios | keys[]' "$BASELINE"); do
@@ -27,7 +50,6 @@ for scenario in $(jq -r '.scenarios | keys[]' "$BASELINE"); do
     cur=$(jq -r ".scenarios[\"$scenario\"].$metric // 0" "$SUMMARY")
 
     if [ "$metric" = p95 ]; then
-      limit=$(jq -r "($base // 0) * $TOLERANCE" "$BASELINE" 2>/dev/null || echo "$base")
       limit=$(awk -v b="$base" -v t="$TOLERANCE" 'BEGIN{printf "%.2f", b*t}')
       verdict=OK
       awk -v c="$cur" -v l="$limit" 'BEGIN{exit !(c > l)}' && verdict=BREACH
@@ -37,11 +59,13 @@ for scenario in $(jq -r '.scenarios | keys[]' "$BASELINE"); do
       limit="0.01000"
       verdict=OK
       awk -v c="$cur" -v l=0.01 'BEGIN{exit !(c > l)}' && verdict=BREACH
-      margin=$(awk -v c="$cur" -v b="$base" 'BEGIN{printf "%+.2f", (c-b)}')
+      # percentage POINTS (rate delta), not a ratio — labeled to avoid
+      # reading as a percent change
+      margin=$(awk -v c="$cur" -v b="$base" 'BEGIN{printf "%+.2fpp", (c-b)*100}')
       [ "$verdict" = BREACH ] && fail=1
     fi
 
-    printf '%-10s %10s %14.2f %14.2f %8.2f %10s %8s\n' \
+    printf '%-10s %10s %10.2f %10.2f %10.2f %8s %10s\n' \
       "$scenario" "$metric" "$base" "$limit" "$cur" "$verdict" "$margin"
   done
 
@@ -49,7 +73,7 @@ for scenario in $(jq -r '.scenarios | keys[]' "$BASELINE"); do
   base99=$(jq -r ".scenarios[\"$scenario\"].p99 // 0" "$BASELINE")
   cur99=$(jq -r ".scenarios[\"$scenario\"].p99 // 0" "$SUMMARY")
   margin99=$(awk -v c="$cur99" -v b="$base99" 'BEGIN{printf "%+.1f%%", (c-b)/b*100}')
-  printf '%-10s %10s %14.2f %14s %8.2f %10s %8s\n' \
+  printf '%-10s %10s %10.2f %10s %10.2f %8s %10s\n' \
     "$scenario" p99 "$base99" "(report)" "$cur99" INFO "$margin99"
 done
 

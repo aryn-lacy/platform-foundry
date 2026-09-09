@@ -62,7 +62,7 @@ export function articles() {
     tags: { scenario: 'articles_list' },
   });
   articlesLatency.add(res.timings.duration);
-  articlesFailed.add(res.status >= 400);
+  articlesFailed.add(res.status === 0 || res.status >= 400);
   check(res, { 'articles 200': (r) => r.status === 200 });
 }
 
@@ -71,7 +71,7 @@ export function tags() {
     tags: { scenario: 'tags' },
   });
   tagsLatency.add(res.timings.duration);
-  tagsFailed.add(res.status >= 400);
+  tagsFailed.add(res.status === 0 || res.status >= 400);
   check(res, { 'tags 200': (r) => r.status === 200 });
 }
 
@@ -89,7 +89,7 @@ export function handleSummary(data) {
       p99: t && t.values ? t.values['p(99)'] : null,
       avg: t && t.values ? t.values.avg : null,
       error_rate: f && f.values ? f.values.rate : null,
-      count: t && t.values ? t.values.count : 0,
+      count: (t && t.values && t.values.count) ?? 0,
     };
   };
   return {
