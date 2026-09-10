@@ -15,8 +15,9 @@ Numbered, dated, one decision each. Status: `accepted`, `superseded`, or `planne
 | 009 | [Hand-rolled modules over community sources](009-hand-rolled-modules.md) | accepted |
 | 010 | [OpenTofu over Terraform](010-opentofu-over-terraform.md) | accepted |
 | 011 | [k6 as the perf gate; how the baseline was seeded](011-k6-perf-gate-baseline.md) | accepted |
+| 012 | [Zero AWS spend as a design constraint](012-zero-spend-constraint.md) | accepted |
 
-All eleven decisions are reflected in code where they live:
+All twelve decisions are reflected in code where they live:
 001/002 in `modules/eks` (Auto Mode config; Pod Identity role +
 association), 003 in the root + `envs/`, 004 in the TLS posture (ACM at
 the edge — the ALB itself is provisioned by Auto Mode's AWS-operated
@@ -28,3 +29,7 @@ controller), 005 in
 the repository ships no ingress manifests — the workload's listener is
 an exercise left to the deployer, consistent with the no-cloud-spend
 posture.)
+
+012 is the constraint those consequences trace back to: it is reflected
+in the Honesty posture of `docs/assumptions.md`, the `perf.yml` header
+semantics, and the error-rate-only canary guard in `k8s/analysis/`.
