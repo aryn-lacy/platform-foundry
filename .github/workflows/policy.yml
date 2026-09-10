@@ -43,11 +43,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: tfsec (fail on HIGH+)
-        uses: aquasecurity/tfsec-action@v1.0.3
+      - name: trivy misconfig (fail on HIGH+)
+        # tfsec retired: Aqua folded it into Trivy (frozen ruleset since
+        # v1.28.14); Trivy's misconfig scanner supersedes it on the same
+        # AVD check IDs. Pinned trivy-action v0.36.0 runs Trivy v0.70.0.
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
-          working_directory: infra
-          minimum_severity: HIGH
+          scan-type: config
+          scan-ref: infra
+          severity: HIGH,CRITICAL
+          exit-code: "1"
       - name: checkov (fail on any finding)
         uses: bridgecrewio/checkov-action@v12.3122.0
         with:

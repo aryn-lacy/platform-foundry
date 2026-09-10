@@ -33,7 +33,7 @@ locals {
   }
 }
 
-# Dedicated CMK per tier for Performance Insights encryption (tfsec
+# Dedicated CMK per tier for Performance Insights encryption (trivy
 # AVD-AWS-0078): app and identity tiers keep separate key material.
 # Explicit key policy (checkov CKV2_AWS_64): account-root IAM control.
 data "aws_partition" "current" {}
@@ -177,7 +177,7 @@ resource "aws_db_instance" "this" {
 
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
   performance_insights_enabled    = true
-  # PI data encrypted with a dedicated per-tier CMK (tfsec AVD-AWS-0078).
+  # PI data encrypted with a dedicated per-tier CMK (AWS-0078).
   performance_insights_kms_key_id = aws_kms_key.pi[each.key].arn
 
   # Minor engine patches applied automatically in their window (checkov

@@ -27,6 +27,10 @@ resource "aws_s3_bucket_versioning" "state" {
   versioning_configuration { status = "Enabled" }
 }
 
+# SSE-S3 (AES256) is the documented posture — same trade-off as the checkov
+# CKV_AWS_145 skip above: a dedicated CMK adds key-management surface with no
+# consumer requirement for a single tfstate bucket (AWS-0132 suppressed).
+#trivy:ignore:AVD-AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
   bucket = aws_s3_bucket.state.id
   rule {

@@ -11,6 +11,26 @@ The platform is the product. The application it deploys is a placeholder payload
 a RealWorld ("Conduit") full-stack app (Spring Boot API, Keycloak identity, React
 frontend) chosen to exercise every part of the delivery system realistically.
 
+## Justifications for technologies used
+- **Argo CD** — Industry standard tooling, I find dev teams have an easier time understanding and using argocd web based ui and pull based application approach for deployment
+- **k6** — small footprint, made it easy to work with in ci/cd pipeline instead of the heavier lift of the other options
+- **OpenTofu** — Better open source support for self hosted ci/cd pipeline technologies (OpenTaco/Digger) along with optional encrypted state. This setup uses an encrypted s3 bucket for state protection for terraform compatibility. Infra code is agnostic and terraform can be dropped in with no changes.
+- **Checkov/trivy** — Excellent static code analysis tools for working with infra code and includes many many classes of misconfigurations and insecure configurations as failures. Great for ensuring secure terraform code. Also include CVE scanner for image creation. 2 tools cover many different classes of failures and are often run together to cover gaps in either tool.
+- **Conftest/OPA** — Enforces policy as code and ensures images and setup adhere to secure implementation and best practices for this pipeline. In this codebase this enforces granular tags for images, least privilege for the container deployment, resource limits must be defined, and restricted-egress.
+- **Github Actions** — CI/CD environment, choice of convenience. This could easily be implemented in any modern CI system like Gitlab CI or Jenkins Pipelines.
+- **EKS Auto Mode** — Used to automatically scale the cluster. Reduces amount of time need for ops to work on clusters. Good trade for small shops where ops labor is at a premium. Can easily be swapped for Karpenter if need. 
+- **Kustomize** — Smaller lift than Helm Charts for adding the services to the eks cluster. Helm would be the choice for a complex setup requiring external packaging. 
+- **Otel Collector/ADOT** — Industry standard tool for collecting and emitting otel metrics and logs for systems like Prometheus and the LGTM stack. ADOT is the AWS method supported method for deploying the otel collector in AWS environments.
+- **Handspun Terraform Modules** — Allows for easy reuse and quick updating of the resources when the pattern is called for again. Community modules typically result in churn for ops teams as the modules get updated and break former established use patterns.
+- **Terraform workspaces** — Infra code should be identical between environments, which is exactly what workspaces model well. In practice that parity is rare, but this stack is small enough that workspaces hold up even when environments diverge heavily — the differences stay in tfvars and conditionals instead of becoming a forked copy of the stack.
+- **Backend** — Represented by [marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql](https://github.com/marcusmonteirodesouza/realworld-backend-spring-boot-java-keycloak-postgresql). I believe that this is a good representation of what a production grade backend would look like and matches architecture I have deployed.
+- **Frontend** — Represented by [yurisldk/realworld-react-fsd](https://github.com/yurisldk/realworld-react-fsd). A well developed and actively kept frontend that maintains the realworld spec. This matches many of the web applications I have deployed. 
+- **Container Promotion** — Handled via tag promotion and enforced via ci/cd pipeline. A Dev Image with the same tag must exist before a prod image can be promoted. Ensures we know what is getting to prod and that the deployment packages match what we have in dev. 
+- **Separate Databases** — Instead of handing the entire backend and Keycloak database in the same physical database, I chose to separate these data stores to better reflect the reality of running similar applications. Typically speaking for security and safety it is better to run individual databases on individual RDS instances unless many databases are needed for a single application.
+- **Canary Rollout** — Used Argo CD Canary Rollouts in production to ensure a smooth deployment where regression issues are caught early.
+- **TLS at Edge** — TLS is controlled via ACM and terminate by an ALB at the edge of the cluster. A planned revision for this architecture would be to implement a mTLS mesh network to better secure application payloads in network depending on business requirements. 
+- **No Caching** — Unnecessary for this demo however would be something to address and change in production as constant raw api calls would hammer the service and potentially lead to degraded performance and spiraling compute costs. 
+
 ## What this repository demonstrates
 
 - **Infrastructure as code** — modular Terraform, pinned providers, one code path
@@ -20,8 +40,8 @@ frontend) chosen to exercise every part of the delivery system realistically.
   NetworkPolicies)
 - **GitOps & progressive delivery** — app-of-apps, per-environment overlays,
   step-pause canaries with AnalysisTemplate guards, commit-as-deploy-record
-- **Supply chain & policy** — Trivy image scanning, tfsec/Checkov on Terraform,
-  Conftest/OPA on rendered manifests, all pre-merge
+- **Supply chain & policy** — Trivy (image CVEs + Terraform misconfig),
+  Checkov (fail on any finding), Conftest/OPA on rendered manifests, all pre-merge
 - **Performance engineering** — k6 load profiles with thresholds, latency
   baselines versioned in git, regressions fail the build
 
@@ -54,6 +74,7 @@ make lint-workflows            # actionlint over CI workflows
 ```
 
 # Provision (per landing zone):
+```
 cd infra
 tofu init
 tofu workspace select dev  # or: tofu workspace new dev
@@ -68,7 +89,7 @@ Remote state bootstrap is the one documented manual step — see
 Two landing zones, one stack. `dev` auto-syncs; `prod` is promotion-gated —
 a pull request that moves the image tag between overlays. The PR *is* the
 audit record. See [`docs/architecture.md`](docs/architecture.md) for the full
-model once published.
+model.
 
 ## Documentation
 
