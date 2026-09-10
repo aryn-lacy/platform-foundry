@@ -110,7 +110,7 @@ resource "aws_iam_role" "flowlogs" {
 }
 
 data "aws_iam_policy_document" "flowlogs_write" {
-  # CreateLogGroup on the exact ARN only (tfsec AVD-AWS-0057: sensitive
+  # CreateLogGroup on the exact ARN only (AWS-0057: sensitive
   # action must not sit on a wildcarded resource); stream/event ops on the
   # group's children.
   statement {
@@ -126,7 +126,7 @@ data "aws_iam_policy_document" "flowlogs_write" {
       "logs:DescribeLogGroups",
       "logs:DescribeLogStreams",
     ]
-    resources = ["${aws_cloudwatch_log_group.flow.arn}:*"] # tfsec:ignore:AVD-AWS-0057: PutLogEvents targets child stream ARNs — the wildcard suffix is structural (streams are created at delivery time); scope is this one group's children, not account-wide
+    resources = ["${aws_cloudwatch_log_group.flow.arn}:*"] # PutLogEvents targets child stream ARNs — the wildcard suffix is structural (streams are created at delivery time); scope is this one group's children, not account-wide
   }
 }
 

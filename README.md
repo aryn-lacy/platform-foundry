@@ -40,8 +40,8 @@ frontend) chosen to exercise every part of the delivery system realistically.
   NetworkPolicies)
 - **GitOps & progressive delivery** — app-of-apps, per-environment overlays,
   step-pause canaries with AnalysisTemplate guards, commit-as-deploy-record
-- **Supply chain & policy** — Trivy image scanning, tfsec/Checkov on Terraform,
-  Conftest/OPA on rendered manifests, all pre-merge
+- **Supply chain & policy** — Trivy (image CVEs + Terraform misconfig),
+  Checkov (fail on any finding), Conftest/OPA on rendered manifests, all pre-merge
 - **Performance engineering** — k6 load profiles with thresholds, latency
   baselines versioned in git, regressions fail the build
 

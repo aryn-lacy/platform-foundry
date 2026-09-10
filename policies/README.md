@@ -8,7 +8,7 @@ Executable guardrails, enforced in CI before anything merges or deploys.
 - `k8s/` — Rego (conftest) rules for rendered manifests
 - `k8s/fixtures/` — pass + fail fixtures; every rule must fire on its fail
   fixture and stay silent on its pass fixture (`make policy-test`)
-- `terraform/` — reserved for custom checks (tfsec/checkov flags live in CI)
+- `terraform/` — reserved for custom checks (trivy/checkov flags live in CI)
 
 ## Rules enforced
 
@@ -29,7 +29,7 @@ the fixtures.
 - `make policy` — render all 12 kustomize targets, conftest each
 - `make policy-test` — prove the rules fire (fail fixtures) and don't
   false-positive (pass fixtures)
-- CI: `.github/workflows/policy.yml` runs the same gate plus tfsec/checkov
+- CI: `.github/workflows/policy.yml` runs the same gate plus trivy/checkov
   on `infra/`
 
 ## Contract

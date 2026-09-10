@@ -1,7 +1,7 @@
 # EKS Auto Mode (ADR-001): AWS operates nodes, load balancer controller,
 # and storage. No managed node groups, no self-installed controllers.
 
-# Dedicated CMK for Kubernetes secrets encryption (tfsec AVD-AWS-0039).
+# Dedicated CMK for Kubernetes secrets encryption (AWS-0039).
 resource "aws_kms_key" "eks_secrets" {
   description             = "${var.project_name}-${terraform.workspace} EKS secrets"
   deletion_window_in_days = 7
@@ -95,7 +95,7 @@ resource "aws_eks_cluster" "this" {
   # node/pod logs flow via the CloudWatch Observability add-on instead.
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
-  # Kubernetes secrets encrypted at rest with a dedicated CMK (tfsec
+  # Kubernetes secrets encrypted at rest with a dedicated CMK (trivy
   # AVD-AWS-0039). Auto Mode nodes/storage are AWS-operated; secrets
   # encryption is the cluster-level control that remains ours.
   encryption_config {
